@@ -3,7 +3,9 @@
 import type { Portal } from "../schema/record.js";
 
 const DOMAIN_HINTS: Array<[RegExp, Portal]> = [
+  // ServiceChannel dispatches from scalert.com as well as servicechannel.com/.net.
   [/servicechannel\.(com|net)$/i, "servicechannel"],
+  [/scalert\.com$/i, "servicechannel"],
   [/corrigo(pro)?\.com$/i, "corrigo"],
   [/heb\.com$/i, "heb"],
   [/fexa\.io$/i, "fexa"],
