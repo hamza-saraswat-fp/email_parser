@@ -12,9 +12,10 @@ if (!file) {
 }
 const parsed = await PostalMime.parse(await readFile(file));
 const client = new AgentMailClient({ apiKey: config.AGENTMAIL_API_KEY });
+// A separate sender inbox on the default domain, so the parser inbox sees a
+// genuine inbound message. clientId makes this idempotent.
 const sender = await client.inboxes.create({
   username: "parser-fixture-sender",
-  domain: "agent.fieldpulse.com",
   displayName: "Fixture sender",
   clientId: "email-parser-fixture-sender",
 });

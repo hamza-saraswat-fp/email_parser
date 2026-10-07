@@ -24,7 +24,7 @@ export async function emlToInbound(path: string): Promise<InboundEmail> {
   const from = parsed.from;
   return {
     message_id: parsed.messageId ?? `replay-${basename(path)}-${Date.now()}`,
-    inbox_id: "parser-dev@agent.fieldpulse.com",
+    inbox_id: "parser_test@agentmail.to",
     from_email: from?.address?.toLowerCase() ?? null,
     from_name: from?.name || null,
     to: (parsed.to ?? []).map((t) => t.address ?? "").filter(Boolean),
@@ -44,7 +44,7 @@ export async function emlToInbound(path: string): Promise<InboundEmail> {
 const customer: Customer = {
   id: "dev",
   name: "Local development",
-  inbox_id: "parser-dev@agent.fieldpulse.com",
+  inbox_id: "parser_test@agentmail.to",
   required_fields: DEFAULT_REQUIRED_FIELDS,
 };
 

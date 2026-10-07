@@ -9,7 +9,7 @@ export default defineConfig({
       AGENTMAIL_API_KEY: "test-dummy-key",
       SUPABASE_URL: "http://localhost:54321",
       SUPABASE_SERVICE_KEY: "test-dummy-service-key",
-      PARSER_INBOX_IDS: "parser-dev@agent.fieldpulse.com",
+      PARSER_INBOX_IDS: "parser_test@agentmail.to",
     },
     include: ["src/**/*.test.ts"],
   },

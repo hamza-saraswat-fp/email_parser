@@ -65,7 +65,7 @@ create table if not exists parser_records (
 );
 
 insert into parser_customers (id, name, inbox_id) values
-  ('dev',   'Local development', 'parser-dev@agent.fieldpulse.com'),
+  ('dev',   'Local development', 'parser_test@agentmail.to'),
   ('demo',  'Demo account',      'parser-demo@agent.fieldpulse.com'),
   ('solis', 'Solis Lighting and Electrical Services', 'solis@agent.fieldpulse.com')
 on conflict (id) do nothing;

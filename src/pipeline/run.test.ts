@@ -5,7 +5,7 @@ import { DEFAULT_REQUIRED_FIELDS } from "../schema/record.js";
 import type { ChatJsonFn } from "../llm/openrouter.js";
 import type { Customer, InboundEmail } from "./types.js";
 
-const customer: Customer = { id: "dev", name: "dev", inbox_id: "parser-dev@agent.fieldpulse.com", required_fields: DEFAULT_REQUIRED_FIELDS };
+const customer: Customer = { id: "dev", name: "dev", inbox_id: "parser_test@agentmail.to", required_fields: DEFAULT_REQUIRED_FIELDS };
 
 function email(over: Partial<InboundEmail> = {}): InboundEmail {
   return {
