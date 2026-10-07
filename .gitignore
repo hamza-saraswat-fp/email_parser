@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+frontend/.env
+frontend/dist/
+.DS_Store
+tmp/
+# Real customer emails never go in the repo (the repo is public).
+fixtures/emails/*
+!fixtures/emails/.gitkeep
+!fixtures/emails/README.md

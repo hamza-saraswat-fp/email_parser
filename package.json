@@ -1,0 +1,39 @@
+{
+  "name": "email_parser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads portal service-request emails (ServiceChannel, Corrigo, H-E-B, ...) from an AgentMail inbox and turns each one into a universal service-request record.",
+  "scripts": {
+    "dev:backend": "tsx watch src/index.ts",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "start": "tsx src/index.ts",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build": "npm run build:frontend",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "replay": "tsx scripts/replay.ts",
+    "send-fixture": "tsx scripts/send-fixture.ts",
+    "create-inbox": "tsx scripts/create-inbox.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "agentmail": "^0.4.12",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "html-to-text": "^9.0.5",
+    "postal-mime": "^2.4.3",
+    "tsx": "^4.19.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/html-to-text": "^9.0.4",
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  }
+}
