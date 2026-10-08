@@ -32,16 +32,18 @@ export async function processInbound(
   deps: PipelineDeps = {},
 ): Promise<RunSummary | null> {
   const log = deps.log ?? ((line: string) => console.log(line));
-  const prefix = `[RUN ${email.message_id.slice(0, 12)}]`;
 
   // received: store the raw email, dedupe on message_id.
   const stored = await store.storeEmail(email, customer.id);
   if (stored.duplicate) {
-    log(`${prefix} duplicate message_id -- skipping`);
+    log(`[RUN] duplicate message_id ${email.message_id} -- skipping`);
     return null;
   }
   const runId = await store.createRun(stored.id, customer.id);
-  log(`${prefix} run ${runId} started (customer=${customer.id}, from=${email.from_email ?? "?"}, subject="${email.subject ?? ""}")`);
+  // Prefix on the run id, not the message id: AgentMail message ids share a
+  // long common prefix, so two concurrent runs were indistinguishable in logs.
+  const prefix = `[RUN ${runId.slice(0, 8)}]`;
+  log(`${prefix} started (customer=${customer.id}, from=${email.from_email ?? "?"}, subject="${email.subject ?? ""}")`);
 
   let position = 0;
   async function step<T>(name: string, input: unknown, fn: () => Promise<T>): Promise<T> {
