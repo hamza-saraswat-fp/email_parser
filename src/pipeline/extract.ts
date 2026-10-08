@@ -18,8 +18,8 @@ export function buildExtractSystemPrompt(): string {
     "contact_email": null, "contact_phone": null
   },
   "site": {
-    "name": "store / location name as written",
-    "identifier": "store number / location id / location number, as written",
+    "name": "the store / location NAME as the portal labels it (e.g. 'ROBINSON RD', 'SAFEWAY Store #3557', '770 KERR1 KERRVILLE 01 MAIN/HAYS ST'). When a store line and a separate address-like line both appear under the requester (e.g. 'SAFEWAY Store #3557' then 'STORE - 6055 SW 185TH AVE, BEAVERTON (NEW)'), the name is the STORE line, never the address line",
+    "identifier": "the store number / location id ONLY, as written (e.g. '207', '770.0', '3557'); never the full store name",
     "address": {"line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null},
     "phone": "the site's phone number"
   },
@@ -28,7 +28,7 @@ export function buildExtractSystemPrompt(): string {
     "category": "category / type if given (e.g. REPAIR, Reactive, Scheduled Maintenance)",
     "area": "area within the site (e.g. BACKROOM, Wareroom, PRODUCE)",
     "asset": "asset / equipment named, if any",
-    "description": "the problem description / work order description VERBATIM, including notes about the problem. Join multiple description fields with a blank line. Do not summarize."
+    "description": "ONLY the free-text problem description / work order description / notes, VERBATIM. Join multiple free-text fields with a blank line. Do NOT prefix it with category or trade labels such as 'PRODUCE > Lighting' or 'Other:' -- those belong in work.area / work.trade. Do not summarize."
   },
   "priority": {"raw": "priority exactly as written (e.g. 'Scheduled Maintenance', '24 hours (Next Business Day)', 'REGULAR (ON-SITE W/I 48 BUSINESS HOURS)')"},
   "deadlines": {
@@ -46,7 +46,7 @@ export function buildExtractSystemPrompt(): string {
 
 Rules:
 - Dates: write ISO 8601 (YYYY-MM-DDTHH:MM:SS). If the email gives a date with no time, use T00:00:00. If only a relative deadline is given (e.g. 'within 5 business days'), leave the deadline null and put the text in extras.
-- Amounts: numeric amount without currency symbols or thousands separators; currency as a 3-letter code when it can be inferred (USD for $), else null.
+- Amounts: numeric amount without currency symbols or thousands separators; currency as a 3-letter code: USD when the amount carries $ or the site is in the US (a bare number like 'NTE 1000.00' at a US address is USD), else null.
 - If the email is a manual forward ("---------- Forwarded message ----------"), extract from the ORIGINAL message, not the forwarding wrapper.
 - Buttons, links, app-store banners, legal footers and check-in instructions are not data; ignore them (but a PIN or IVR code is data for extras ONLY if it is not a credential -- never include a PIN).
 - If two values conflict for the same field (e.g. two different cities), keep the value from the primary/site address field and mention the conflict in notes.
