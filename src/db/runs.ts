@@ -8,9 +8,26 @@ export async function listRuns(limit = 50) {
     .order("started_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(`parser_runs list: ${error.message}`);
+  const ids = (data ?? []).map((r) => r.id as string);
+  const [stepsRes, recordsRes] = ids.length
+    ? await Promise.all([
+        supabase.from("parser_run_steps").select("run_id, position, name, status, duration_ms").in("run_id", ids).order("position"),
+        supabase.from("parser_records").select("run_id, required_missing").in("run_id", ids),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (stepsRes.error) throw new Error(`parser_run_steps list: ${stepsRes.error.message}`);
+  if (recordsRes.error) throw new Error(`parser_records list: ${recordsRes.error.message}`);
+  const stepsByRun = new Map<string, Array<{ name: string; status: string; duration_ms: number | null }>>();
+  for (const s of stepsRes.data ?? []) {
+    const list = stepsByRun.get(s.run_id as string) ?? [];
+    list.push({ name: s.name as string, status: s.status as string, duration_ms: (s.duration_ms as number | null) ?? null });
+    stepsByRun.set(s.run_id as string, list);
+  }
+  const checksByRun = new Map<string, unknown>();
+  for (const rec of recordsRes.data ?? []) checksByRun.set(rec.run_id as string, rec.required_missing);
   return (data ?? []).map((r) => {
     const { parser_emails, ...run } = r as typeof r & { parser_emails: Record<string, unknown> | null };
-    return { ...run, email: parser_emails };
+    return { ...run, email: parser_emails, steps: stepsByRun.get(r.id as string) ?? [], checks: checksByRun.get(r.id as string) ?? null };
   });
 }
 

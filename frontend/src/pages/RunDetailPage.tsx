@@ -5,17 +5,7 @@ import { api, failedChecks, type RunStep } from "@/lib/api";
 import { navigate } from "@/lib/router";
 import { StatusBadge } from "@/components/StatusBadge";
 import { JsonBlock } from "@/components/JsonBlock";
-
-const STEP_LABELS: Record<string, string> = {
-  received: "Received",
-  cleaned: "Cleaned to plain text",
-  classified: "Classified",
-  sorted: "Sorted (Jev)",
-  extracted: "Read (Sonnet)",
-  verified: "Verified against the email",
-  semantic: "Semantic checks (Jev)",
-  checked: "Required fields",
-};
+import { PIPELINE_STEPS, STEP_LABELS as LABELS, STEP_KIND, notRunReason, fmtMs } from "@/lib/steps";
 
 function pct(n: unknown) { return typeof n === "number" ? `${Math.round(n * 100)}%` : "—"; }
 
@@ -34,9 +24,20 @@ function Bars({ values }: { values: Record<string, number> }) {
   );
 }
 
-function Step({ step }: { step: RunStep }) {
+function tokens(out: Record<string, unknown> | null): string | null {
+  const u = out?.usage as { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number } | null | undefined;
+  if (!u) return null;
+  const i = u.input_tokens ?? u.prompt_tokens;
+  const o = u.output_tokens ?? u.completion_tokens;
+  return i == null && o == null ? null : `${i ?? "?"} in / ${o ?? "?"} out tokens`;
+}
+
+function Step({ step, maxMs }: { step: RunStep; maxMs: number }) {
   const [open, setOpen] = useState(step.status === "failed");
   const out = step.output as Record<string, unknown> | null;
+  const tok = tokens(out);
+  const kind = STEP_KIND[step.name] ?? "code";
+  const verifyFailures = step.name === "verified" && Array.isArray(out?.failures) ? (out!.failures as Array<{ field: string; rule: string; value: string }>) : [];
   const decision = out?.decision as { outcome?: string; reason?: string } | undefined;
   const summary =
     step.name === "cleaned" && out ? `${out.chars} chars from ${out.source}${out.trimmed_forward_wrapper ? ", forward wrapper trimmed" : ""}` :
@@ -57,11 +58,29 @@ function Step({ step }: { step: RunStep }) {
       <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 px-3 py-2 text-left">
         {open ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
         <span className="w-6 text-xs text-slate-400">{step.position}</span>
-        <span className="font-medium">{STEP_LABELS[step.name] ?? step.name}</span>
-        <span className="truncate text-sm text-slate-500">{summary}</span>
-        <span className="ml-auto whitespace-nowrap text-xs text-slate-400">{step.duration_ms ?? 0} ms</span>
+        <span className="whitespace-nowrap font-medium">{LABELS[step.name] ?? step.name}</span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${kind === "model" ? "bg-violet-100 text-violet-800" : "bg-sky-100 text-sky-800"}`}>{kind}</span>
+        <span className="min-w-0 truncate text-sm text-slate-500">{summary}</span>
+        <span className="ml-auto flex items-center gap-2 whitespace-nowrap text-xs text-slate-400">
+          {tok && <span className="hidden sm:inline">{tok}</span>}
+          <span className="hidden h-1.5 w-24 rounded bg-slate-100 sm:inline-block"><span className="block h-1.5 rounded bg-slate-400" style={{ width: `${Math.max(2, Math.round(((step.duration_ms ?? 0) / Math.max(1, maxMs)) * 100))}%` }} /></span>
+          <span className="w-12 text-right tabular-nums">{fmtMs(step.duration_ms)}</span>
+        </span>
         <StatusBadge status={step.status} />
       </button>
+      {open && verifyFailures.length > 0 && (
+        <div className="border-t border-slate-100 p-3">
+          <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Values not supported by the email</div>
+          <table className="w-full text-sm"><thead><tr className="text-left text-xs text-slate-500"><th className="py-1 pr-3">Field</th><th className="py-1 pr-3">Rule</th><th className="py-1">Value</th></tr></thead>
+            <tbody>{verifyFailures.map((f, i) => <tr key={i} className="border-t border-slate-100"><td className="py-1 pr-3 font-mono text-xs">{f.field}</td><td className="py-1 pr-3">{f.rule}</td><td className="py-1 font-mono text-xs">{f.value}</td></tr>)}</tbody></table>
+        </div>
+      )}
+      {open && step.name === "cleaned" && typeof out?.body === "string" && (
+        <div className="border-t border-slate-100 p-3">
+          <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Text the models read ({(out.body as string).length} chars)</div>
+          <JsonBlock value={out.body} maxHeight="24rem" />
+        </div>
+      )}
       {open && bars && (
         <div className="grid gap-4 border-t border-slate-100 p-3 md:grid-cols-2">
           {Object.entries(bars).map(([title, values]) => (
@@ -169,9 +188,30 @@ export function RunDetailPage({ id }: { id: string }) {
       </div>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Steps</h2>
+        <h2 className="mb-2 flex items-baseline gap-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Steps
+          <span className="text-xs font-normal normal-case tracking-normal text-slate-400">
+            {data.steps.length} of {PIPELINE_STEPS.length} ran · {fmtMs(data.steps.reduce((n, s) => n + (s.duration_ms ?? 0), 0))} total
+          </span>
+        </h2>
         <ol className="space-y-2">
-          {data.steps.map((s) => <Step key={s.id} step={s} />)}
+          {(() => {
+            const maxMs = Math.max(1, ...data.steps.map((s) => s.duration_ms ?? 0));
+            const byName = new Map(data.steps.map((s) => [s.name, s]));
+            const lastStep = data.steps.at(-1)?.name;
+            const known = PIPELINE_STEPS.map((name) => byName.get(name) ?? null);
+            const extra = data.steps.filter((s) => !(PIPELINE_STEPS as readonly string[]).includes(s.name));
+            return [
+              ...known.map((s, i) => s
+                ? <Step key={s.id} step={s} maxMs={maxMs} />
+                : <li key={PIPELINE_STEPS[i]} className="flex items-center gap-3 rounded-lg border border-dashed border-slate-200 px-3 py-2 text-slate-400">
+                    <span className="w-4" /><span className="w-6 text-xs">{i + 1}</span>
+                    <span className="font-medium">{LABELS[PIPELINE_STEPS[i]]}</span>
+                    <span className="text-sm">{notRunReason(data.status, lastStep)}</span>
+                  </li>),
+              ...extra.map((s) => <Step key={s.id} step={s} maxMs={maxMs} />),
+            ];
+          })()}
           {data.status === "running" && <li className="text-sm text-slate-400">working…</li>}
         </ol>
       </section>

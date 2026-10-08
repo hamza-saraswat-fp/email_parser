@@ -21,9 +21,14 @@ const envSchema = z.object({
     .min(1, "PARSER_INBOX_IDS is required")
     .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
   PORT: z.coerce.number().default(3000),
+  // Set to "false" to serve the API and page without subscribing to the inbox
+  // (local UI work while Railway owns the inbox; two listeners would race).
+  PARSER_LISTENER: z.enum(["true", "false"]).default("true"),
   // Universal Auth (fieldpulse-auth). When set, every /api call must carry a
   // FieldPulse-issued token. Unset = open API, for local dev and tests only.
-  FP_AUTH_URL: z.string().url().optional(),
+  // An empty string counts as unset, so `FP_AUTH_URL= npm run ...` can turn
+  // sign-in off for local UI work even though .env sets it.
+  FP_AUTH_URL: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.string().url().optional()),
 });
 
 const parsed = envSchema.safeParse(process.env);

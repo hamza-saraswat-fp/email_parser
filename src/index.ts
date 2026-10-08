@@ -33,9 +33,13 @@ const server = app.listen(config.PORT, () => {
   console.log(`[HTTP] API listening on port ${config.PORT}`);
 });
 
-startListener(routeInbound, emailExists).catch((err) => {
-  console.error("Listener failed to start (API still works):", err);
-});
+if (config.PARSER_LISTENER === "true") {
+  startListener(routeInbound, emailExists).catch((err) => {
+    console.error("Listener failed to start (API still works):", err);
+  });
+} else {
+  console.warn("[WS] PARSER_LISTENER=false -- not subscribing to any inbox; API and page only.");
+}
 
 function shutdown() {
   console.log("\nShutting down...");

@@ -15,6 +15,8 @@ export interface RunListItem {
   reviewed_by?: string | null;
   reviewed_at?: string | null;
   email: { from_email: string | null; subject: string | null; received_at: string } | null;
+  steps?: Array<{ name: string; status: string; duration_ms: number | null }>;
+  checks?: CheckResults | string[] | null;
 }
 
 export interface RunStep {

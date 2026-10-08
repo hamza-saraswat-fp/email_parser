@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type RunListItem, type RunStatus } from "@/lib/api";
 import { navigate } from "@/lib/router";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StepTrack } from "@/components/StepTrack";
+import { failedChecks } from "@/lib/api";
 
 function timeAgo(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -58,10 +60,10 @@ export function RunsPage() {
               <tr>
                 <th className="px-3 py-2">When</th>
                 <th className="px-3 py-2">Customer</th>
-                <th className="px-3 py-2">From</th>
                 <th className="px-3 py-2">Subject</th>
-                <th className="px-3 py-2">Portal</th>
-                <th className="px-3 py-2">Type</th>
+                <th className="px-3 py-2">Portal · type</th>
+                <th className="px-3 py-2">Steps</th>
+                <th className="px-3 py-2">Checks</th>
                 <th className="px-3 py-2">Status</th>
               </tr>
             </thead>
@@ -74,11 +76,14 @@ export function RunsPage() {
                 >
                   <td className="whitespace-nowrap px-3 py-2 text-slate-500">{timeAgo(r.started_at)}</td>
                   <td className="px-3 py-2">{r.customer_id}</td>
-                  <td className="max-w-[16rem] truncate px-3 py-2 text-slate-600">{r.email?.from_email ?? "—"}</td>
-                  <td className="max-w-[24rem] truncate px-3 py-2">{r.email?.subject ?? "(no subject)"}</td>
-                  <td className="px-3 py-2">{r.portal ?? "—"}</td>
-                  <td className="px-3 py-2">{r.email_type ?? "—"}</td>
-                  <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
+                  <td className="max-w-[22rem] px-3 py-2">
+                    <div className="truncate">{r.email?.subject ?? "(no subject)"}</div>
+                    <div className="truncate text-xs text-slate-500">{r.email?.from_email ?? "—"}</div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.portal ?? "—"}<div className="text-xs text-slate-500">{r.email_type ?? "—"}</div></td>
+                  <td className="px-3 py-2"><StepTrack steps={r.steps ?? []} status={r.status} /></td>
+                  <td className="px-3 py-2">{(() => { const f = failedChecks(r.checks); return f.length ? <span className="text-amber-700" title={f.join("\n")}>{f.length} failed</span> : r.steps?.some((s) => s.name === "checked") ? <span className="text-emerald-700">clean</span> : <span className="text-slate-400">—</span>; })()}</td>
+                  <td className="px-3 py-2"><StatusBadge status={r.status} />{r.reviewed_by ? <div className="mt-0.5 max-w-[10rem] truncate text-[11px] text-slate-500" title={r.reviewed_by}>{r.reviewed_by}</div> : null}</td>
                 </tr>
               ))}
             </tbody>
