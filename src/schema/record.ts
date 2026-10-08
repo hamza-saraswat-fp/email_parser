@@ -10,6 +10,26 @@ const ns = z
   .nullish()
   .transform((v) => (v && v.trim() ? v.trim() : null));
 
+// Readers assemble the description from several labelled fields and are not
+// consistent about it: a paragraph wrapped in quotes one run and bare the next,
+// or the same text repeated under two labels. Make that deterministic here.
+export function tidyDescription(text: string): string {
+  const norm = (p: string) => p.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const paras = text
+    .split(/\n{2,}/)
+    .map((p) => p.trim().replace(/^["'\u201c\u2018]+|["'\u201d\u2019]+$/g, "").trim())
+    .filter(Boolean);
+  const kept: string[] = [];
+  for (const p of paras) {
+    const n = norm(p);
+    if (!n) continue;
+    if (kept.some((k) => norm(k).includes(n))) continue;            // already covered by an earlier paragraph
+    const idx = kept.findIndex((k) => n.includes(norm(k)));          // this one covers an earlier, shorter paragraph
+    if (idx >= 0) kept[idx] = p; else kept.push(p);
+  }
+  return kept.join("\n\n");
+}
+
 export const PORTALS = ["servicechannel", "corrigo", "heb", "fexa", "servicepower", "other"] as const;
 export const portalSchema = z.enum(PORTALS);
 export type Portal = z.infer<typeof portalSchema>;
@@ -53,7 +73,7 @@ export const extractedSchema = z.object({
     category: ns,
     area: ns,
     asset: ns,
-    description: ns,
+    description: ns.transform((v) => (v ? tidyDescription(v) : v)),
   }),
   priority: z.object({ raw: ns }),
   deadlines: z.object({

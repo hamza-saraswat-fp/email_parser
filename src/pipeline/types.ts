@@ -41,7 +41,16 @@ export interface StepRow {
   duration_ms: number;
 }
 
-export type RunStatus = "running" | "ready" | "needs_review" | "skipped" | "failed";
+export type RunStatus = "running" | "ready" | "needs_review" | "skipped" | "failed" | "approved" | "rejected";
+
+// Everything that can send a run to a person, kept apart so the reviewer sees
+// each kind on its own.
+export interface CheckResults {
+  sort: string[];      // e.g. ["sort_uncertain"]
+  verify: string[];    // e.g. ["site.address.line1: not in email"]
+  semantic: string[];  // e.g. ["address_is_the_site: 0.41"]
+  required: string[];  // e.g. ["work.description"]
+}
 
 export interface RunPatch {
   status: RunStatus;
@@ -57,7 +66,7 @@ export interface RunStore {
   createRun(emailId: string, customerId: string): Promise<string>;
   addStep(runId: string, step: StepRow): Promise<void>;
   finishRun(runId: string, patch: RunPatch): Promise<void>;
-  storeRecord(runId: string, customerId: string, record: ServiceRequest, requiredMissing: string[]): Promise<void>;
+  storeRecord(runId: string, customerId: string, record: ServiceRequest, checks: CheckResults): Promise<void>;
 }
 
 export interface RunSummary {
@@ -65,7 +74,12 @@ export interface RunSummary {
   status: RunStatus;
   email_type: EmailType | null;
   portal: Portal | null;
-  required_missing: string[];
+  checks: CheckResults;
   record: ServiceRequest | null;
   error: string | null;
 }
+
+export const emptyChecks = (): CheckResults => ({ sort: [], verify: [], semantic: [], required: [] });
+export const checksFailed = (c: CheckResults): string[] => [
+  ...c.sort, ...c.verify.map((x) => `verify: ${x}`), ...c.semantic.map((x) => `semantic: ${x}`), ...c.required.map((x) => `required: ${x}`),
+];

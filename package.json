@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit",
     "replay": "tsx scripts/replay.ts",
     "compare": "tsx scripts/compare-records.ts",
+    "eval": "tsx scripts/eval.ts",
+    "jev-smoke": "tsx scripts/jev-smoke.ts",
     "send-fixture": "tsx scripts/send-fixture.ts",
     "create-inbox": "tsx scripts/create-inbox.ts"
   },

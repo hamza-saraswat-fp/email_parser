@@ -4,9 +4,15 @@ import { z } from "zod";
 const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   OPENROUTER_MODEL: z.string().default("anthropic/claude-sonnet-4"),
-  // Per-step overrides. Unset = use OPENROUTER_MODEL for that step.
-  OPENROUTER_MODEL_CLASSIFY: z.string().optional(),
+  // The reader's model. Unset = OPENROUTER_MODEL.
   OPENROUTER_MODEL_EXTRACT: z.string().optional(),
+  // Jev (TypeSafe) through the Vercel AI Gateway: sorting and semantic checks.
+  AI_GATEWAY_API_KEY: z.string().min(1, "AI_GATEWAY_API_KEY is required"),
+  JEV_MODEL: z.string().default("typesafe-ai/jev"),
+  // Below this, a sort result is not acted on: the run goes to a person.
+  JEV_SORT_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.7),
+  // Below this, a semantic check fails and the run goes to a person.
+  JEV_CHECK_MIN: z.coerce.number().min(0).max(1).default(0.7),
   AGENTMAIL_API_KEY: z.string().min(1, "AGENTMAIL_API_KEY is required"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -32,6 +38,5 @@ if (!parsed.success) {
 
 export const config = {
   ...parsed.data,
-  OPENROUTER_MODEL_CLASSIFY: parsed.data.OPENROUTER_MODEL_CLASSIFY ?? parsed.data.OPENROUTER_MODEL,
   OPENROUTER_MODEL_EXTRACT: parsed.data.OPENROUTER_MODEL_EXTRACT ?? parsed.data.OPENROUTER_MODEL,
 };

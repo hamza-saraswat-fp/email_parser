@@ -2,7 +2,7 @@
 // awaited and errors propagate (a run without steps is worse than a loud failure).
 import { supabase } from "./client.js";
 import type { ServiceRequest } from "../schema/record.js";
-import type { InboundEmail, RunPatch, RunStore, StepRow } from "../pipeline/types.js";
+import type { CheckResults, InboundEmail, RunPatch, RunStore, StepRow } from "../pipeline/types.js";
 
 export class SupabaseStore implements RunStore {
   async storeEmail(email: InboundEmail, customerId: string | null) {
@@ -63,10 +63,12 @@ export class SupabaseStore implements RunStore {
     if (error) throw new Error(`parser_runs update: ${error.message}`);
   }
 
-  async storeRecord(runId: string, customerId: string, record: ServiceRequest, requiredMissing: string[]) {
+  // `required_missing` keeps its column name; it now holds every check result
+  // ({ sort, verify, semantic, required }) so a reviewer sees all of them.
+  async storeRecord(runId: string, customerId: string, record: ServiceRequest, checks: CheckResults) {
     const { error } = await supabase
       .from("parser_records")
-      .insert({ run_id: runId, customer_id: customerId, record, required_missing: requiredMissing });
+      .insert({ run_id: runId, customer_id: customerId, record, required_missing: checks });
     if (error) throw new Error(`parser_records insert: ${error.message}`);
   }
 }

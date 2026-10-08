@@ -8,7 +8,7 @@ import { supabase } from "./db/client.js";
 import type { InboundEmail } from "./pipeline/types.js";
 
 console.log("email_parser starting...");
-console.log(`  Models: sort=${config.OPENROUTER_MODEL_CLASSIFY} read=${config.OPENROUTER_MODEL_EXTRACT}`);
+console.log(`  Models: sort+checks=${config.JEV_MODEL} (min ${config.JEV_SORT_MIN_CONFIDENCE}/${config.JEV_CHECK_MIN})  read=${config.OPENROUTER_MODEL_EXTRACT}`);
 console.log(`  Inbox(es): ${config.PARSER_INBOX_IDS.join(", ")}`);
 
 const store = new SupabaseStore();

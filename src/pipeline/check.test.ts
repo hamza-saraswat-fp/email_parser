@@ -30,3 +30,12 @@ describe("checkRequired", () => {
     expect(checkRequired({ limits: { not_to_exceed: { amount: 0 } } }, ["limits.not_to_exceed.amount"])).toEqual([]);
   });
 });
+
+import { tidyDescription } from "../schema/record.js";
+describe("tidyDescription", () => {
+  it("strips wrapping quotes and drops a paragraph already covered by another", () => {
+    expect(tidyDescription('no lights in produce\n\nPRODUCE:Lighting:Other::no lights in produce')).toBe("PRODUCE:Lighting:Other::no lights in produce");
+    expect(tidyDescription('Note text.\n\n"BACKROOM / Light bulb is out"')).toBe("Note text.\n\nBACKROOM / Light bulb is out");
+    expect(tidyDescription("Same text\n\nsame text!")).toBe("Same text");
+  });
+});

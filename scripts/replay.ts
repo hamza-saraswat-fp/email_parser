@@ -2,8 +2,7 @@
 //
 //   npm run replay -- fixtures/emails/servicechannel.eml
 //   npm run replay -- fixtures/emails/*.eml --db                    # also write to Supabase as customer "dev"
-//   npm run replay -- fixtures/emails/*.eml --classify-model anthropic/claude-haiku-5.5 \
-//                     --extract-model anthropic/claude-sonnet-5.5 --out tmp/models/try1
+//   npm run replay -- fixtures/emails/*.eml --extract-model anthropic/claude-sonnet-5.5 --out tmp/models/try1
 //
 // --out writes one JSON per email (summary, steps with timings, record) so two
 // runs can be diffed with scripts/compare-records.ts.
@@ -13,19 +12,20 @@ import PostalMime from "postal-mime";
 import { processInbound } from "../src/pipeline/run.js";
 import { MemoryStore } from "../src/pipeline/memory-store.js";
 import { DEFAULT_REQUIRED_FIELDS } from "../src/schema/record.js";
-import type { Customer, InboundEmail, RunStore } from "../src/pipeline/types.js";
+import { checksFailed, type Customer, type InboundEmail, type RunStore } from "../src/pipeline/types.js";
 
-const argv = process.argv.slice(2);
+const isMain = process.argv[1]?.endsWith("replay.ts");
+const argv = isMain ? process.argv.slice(2) : [];
 function flag(name: string): string | undefined {
   const i = argv.indexOf(name);
   return i >= 0 ? argv[i + 1] : undefined;
 }
 const useDb = argv.includes("--db");
 const outDir = flag("--out");
-const models = { classify: flag("--classify-model"), extract: flag("--extract-model") };
-const files = argv.filter((a, i) => !a.startsWith("--") && !["--out", "--classify-model", "--extract-model"].includes(argv[i - 1] ?? ""));
-if (!files.length) {
-  console.error("usage: npm run replay -- <file.eml> [more.eml ...] [--db] [--out dir] [--classify-model id] [--extract-model id]");
+const models = { extract: flag("--extract-model") };
+const files = argv.filter((a, i) => !a.startsWith("--") && !["--out", "--extract-model"].includes(argv[i - 1] ?? ""));
+if (isMain && !files.length) {
+  console.error("usage: npm run replay -- <file.eml> [more.eml ...] [--db] [--out dir] [--extract-model id]");
   process.exit(1);
 }
 
@@ -60,7 +60,9 @@ const customer: Customer = {
 };
 
 let store: RunStore;
-if (useDb) {
+if (!isMain) {
+  store = new MemoryStore();
+} else if (useDb) {
   const { SupabaseStore } = await import("../src/db/store.js");
   store = new SupabaseStore();
 } else {
@@ -81,12 +83,13 @@ for (const file of files) {
     }
   }
   console.log(`status: ${summary.status}  type: ${summary.email_type}  portal: ${summary.portal}`);
-  if (summary.required_missing.length) console.log(`missing: ${summary.required_missing.join(", ")}`);
+  const failed = checksFailed(summary.checks);
+  if (failed.length) console.log(`checks failed: ${failed.join(" | ")}`);
   if (summary.record && !outDir) console.log(JSON.stringify(summary.record, null, 2));
   if (outDir) {
     const out = {
       file,
-      summary: { status: summary.status, email_type: summary.email_type, portal: summary.portal, required_missing: summary.required_missing, error: summary.error },
+      summary: { status: summary.status, email_type: summary.email_type, portal: summary.portal, checks: summary.checks, error: summary.error },
       steps: (run?.steps ?? []).map((s) => ({ name: s.name, status: s.status, duration_ms: s.duration_ms, model: (s.output as { model?: string } | null)?.model ?? null })),
       record: summary.record,
     };

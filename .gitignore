@@ -9,3 +9,5 @@ tmp/
 fixtures/emails/*
 !fixtures/emails/.gitkeep
 !fixtures/emails/README.md
+fixtures/expected/*
+!fixtures/expected/.gitkeep

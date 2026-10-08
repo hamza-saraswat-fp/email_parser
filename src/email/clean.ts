@@ -50,3 +50,15 @@ export function cleanEmail(fields: { text?: string | null; html?: string | null 
   if (text) return { body: text, source: "text" };
   return { body: "", source: "none" };
 }
+
+// A manually forwarded email carries the forwarder's signature and headers
+// above the original. Everything before the LAST "Forwarded message" marker is
+// wrapper (a double forward has two markers); the original message follows it.
+// Used for every model call and for the verify step, so all of them see the
+// same text. The stored email keeps the full body.
+export function focusBody(body: string): string {
+  const marker = /-{3,}\s*Forwarded message\s*-{3,}/gi;
+  let last = -1;
+  for (const m of body.matchAll(marker)) last = m.index ?? last;
+  return last >= 0 ? body.slice(last).trim() : body;
+}

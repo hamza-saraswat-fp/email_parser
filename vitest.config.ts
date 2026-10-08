@@ -10,6 +10,7 @@ export default defineConfig({
       SUPABASE_URL: "http://localhost:54321",
       SUPABASE_SERVICE_KEY: "test-dummy-service-key",
       PARSER_INBOX_IDS: "parser_test@agentmail.to",
+      AI_GATEWAY_API_KEY: "test-dummy-key",
     },
     include: ["src/**/*.test.ts"],
   },

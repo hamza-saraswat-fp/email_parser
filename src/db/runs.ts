@@ -4,7 +4,7 @@ import { supabase } from "./client.js";
 export async function listRuns(limit = 50) {
   const { data, error } = await supabase
     .from("parser_runs")
-    .select("id, customer_id, status, email_type, portal, confidence, error, started_at, finished_at, parser_emails(from_email, subject, received_at)")
+    .select("id, customer_id, status, email_type, portal, confidence, error, started_at, finished_at, reviewed_by, reviewed_at, parser_emails(from_email, subject, received_at)")
     .order("started_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(`parser_runs list: ${error.message}`);
@@ -30,4 +30,20 @@ export async function getRun(id: string) {
   if (record.error) throw new Error(`parser_records get: ${record.error.message}`);
   const { parser_emails, ...rest } = run.data as Record<string, unknown> & { parser_emails: unknown };
   return { ...rest, email: parser_emails, steps: steps.data ?? [], record: record.data ?? null };
+}
+
+// A person's decision. Allowed from ready or needs_review only; anything else
+// (running, skipped, failed, already reviewed) is refused so the audit trail
+// stays honest.
+export async function reviewRun(id: string, decision: "approved" | "rejected", reviewer: string, note: string | null) {
+  const { data: run, error: lookupErr } = await supabase.from("parser_runs").select("status").eq("id", id).maybeSingle();
+  if (lookupErr) throw new Error(`parser_runs get: ${lookupErr.message}`);
+  if (!run) return { ok: false as const, reason: "not found" };
+  if (run.status !== "ready" && run.status !== "needs_review") return { ok: false as const, reason: `cannot review a run in status ${run.status}` };
+  const { error } = await supabase
+    .from("parser_runs")
+    .update({ status: decision, reviewed_by: reviewer, reviewed_at: new Date().toISOString(), review_note: note })
+    .eq("id", id);
+  if (error) throw new Error(`parser_runs review: ${error.message}`);
+  return { ok: true as const };
 }

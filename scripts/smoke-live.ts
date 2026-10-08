@@ -52,7 +52,7 @@ if (result === "timeout") {
   process.exit(2);
 }
 const summary = result as Awaited<ReturnType<typeof processInbound>>;
-console.log("[SMOKE] result:", JSON.stringify({ status: summary?.status, email_type: summary?.email_type, portal: summary?.portal, missing: summary?.required_missing }, null, 0));
+console.log("[SMOKE] result:", JSON.stringify({ status: summary?.status, email_type: summary?.email_type, portal: summary?.portal, checks: summary?.checks }, null, 0));
 if (summary?.record) {
   const r = summary.record;
   console.log("[SMOKE] record:", JSON.stringify({ reference: r.reference.primary, site: r.site.name, address: r.site.address.line1, nte: r.limits.not_to_exceed?.amount, description: r.work.description?.slice(0, 60) }));

@@ -4,6 +4,8 @@ const STYLES: Record<string, string> = {
   needs_review: "bg-amber-100 text-amber-800",
   skipped: "bg-slate-200 text-slate-700",
   failed: "bg-red-100 text-red-800",
+  approved: "bg-emerald-200 text-emerald-900",
+  rejected: "bg-rose-200 text-rose-900",
   ok: "bg-green-100 text-green-800",
 };
 

@@ -3,7 +3,7 @@ import path from "node:path";
 import { configureAuth } from "@fieldpulse/auth";
 import { config } from "./config.js";
 import { createAuthMiddleware } from "./auth.js";
-import { listRuns, getRun } from "./db/runs.js";
+import { listRuns, getRun, reviewRun } from "./db/runs.js";
 import { listCustomers } from "./db/customers.js";
 
 export const app = express();
@@ -45,6 +45,22 @@ app.get("/api/runs/:id", async (req, res) => {
     res.status(500).json({ error: (err as Error).message });
   }
 });
+
+// Review: approve or reject. The reviewer is the signed-in FieldPulse user when
+// auth is on; "local" when the API is open (dev only).
+for (const decision of ["approved", "rejected"] as const) {
+  app.post(`/api/runs/:id/${decision === "approved" ? "approve" : "reject"}`, async (req, res) => {
+    try {
+      const reviewer = (res.locals.claims?.email as string | undefined) ?? "local";
+      const note = typeof req.body?.note === "string" && req.body.note.trim() ? req.body.note.trim().slice(0, 2000) : null;
+      const result = await reviewRun(req.params.id, decision, reviewer, note);
+      if (!result.ok) return res.status(result.reason === "not found" ? 404 : 409).json({ error: result.reason });
+      res.json({ ok: true, status: decision, reviewed_by: reviewer });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+}
 
 // Serve the built frontend when it exists (production).
 const frontendDist = path.join(import.meta.dirname, "../frontend/dist");

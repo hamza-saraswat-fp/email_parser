@@ -12,6 +12,8 @@ Portal service-request emails in, universal service-request records out. See REA
 - Migrations are idempotent (`create table if not exists`, `on conflict do nothing`).
 - `fixtures/emails/` holds real customer emails and is gitignored. The repo is public: never commit customer data or `.env`.
 - Use en-dashes (--), not em-dashes, in user-facing text.
+- **Models propose; code decides.** The reader's output never reaches `ready` without the verify step (every value found in the email) and the semantic step. Never relax a check to make a run pass; fix the prompt or the criteria, then prove it with `npm run eval`.
+- **`npm run eval` before deploying** any change to a prompt, a model, a threshold or Jev criteria. Expected files live in `fixtures/expected/` (gitignored, same data as the emails).
 
 ## Out of scope for V1
 

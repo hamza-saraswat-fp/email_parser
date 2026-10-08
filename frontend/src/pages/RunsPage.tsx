@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type RunListItem, type RunStatus } from "@/lib/api";
 import { navigate } from "@/lib/router";
@@ -11,7 +12,7 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-const STATUS_ORDER: RunStatus[] = ["running", "ready", "needs_review", "skipped", "failed"];
+const STATUS_ORDER: RunStatus[] = ["running", "ready", "needs_review", "approved", "rejected", "skipped", "failed"];
 
 export function RunsPage() {
   const { data, isLoading, error } = useQuery({
@@ -20,16 +21,23 @@ export function RunsPage() {
     refetchInterval: 2_000,
   });
 
+  const [filter, setFilter] = useState<RunStatus | null>(null);
   const counts = STATUS_ORDER.map((s) => [s, (data ?? []).filter((r) => r.status === s).length] as const);
+  const rows = (data ?? []).filter((r) => !filter || r.status === filter);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-2 text-lg font-semibold">Runs</h1>
         {counts.map(([s, n]) => (
-          <span key={s} className="flex items-center gap-1 text-xs text-slate-600">
+          <button
+            key={s}
+            onClick={() => setFilter(filter === s ? null : s)}
+            className={`flex items-center gap-1 rounded px-1 text-xs text-slate-600 ${filter === s ? "ring-2 ring-slate-400" : ""}`}
+            title={filter === s ? "Show all" : `Show only ${s}`}
+          >
             <StatusBadge status={s} /> {n}
-          </span>
+          </button>
         ))}
         <span className="ml-auto text-xs text-slate-400">refreshes every 2s</span>
       </div>
@@ -58,7 +66,7 @@ export function RunsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((r: RunListItem) => (
+              {rows.map((r: RunListItem) => (
                 <tr
                   key={r.id}
                   onClick={() => navigate(`/runs/${r.id}`)}

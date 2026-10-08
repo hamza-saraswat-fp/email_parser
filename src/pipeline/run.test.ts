@@ -3,22 +3,18 @@ import { processInbound } from "./run.js";
 import { MemoryStore } from "./memory-store.js";
 import { DEFAULT_REQUIRED_FIELDS } from "../schema/record.js";
 import type { ChatJsonFn } from "../llm/openrouter.js";
+import type { AskJevFn } from "../llm/jev.js";
 import type { Customer, InboundEmail } from "./types.js";
 
 const customer: Customer = { id: "dev", name: "dev", inbox_id: "parser_test@agentmail.to", required_fields: DEFAULT_REQUIRED_FIELDS };
 
+const HTML = "<p>New Service Request #1</p><p>Customer <b>TOPS</b></p><p>PO# 1</p><p>Address 1 Main St, Amherst NY 14228</p><p>Problem: light out</p>";
+
 function email(over: Partial<InboundEmail> = {}): InboundEmail {
   return {
-    message_id: `<m-${Math.random()}@test>`,
-    inbox_id: customer.inbox_id,
-    from_email: "dispatch@servicechannel.com",
-    from_name: "ServiceChannel",
-    to: ["service@example.com"],
-    subject: "New Service Request #1",
-    text: null,
-    html: "<p>Customer <b>TOPS</b></p><p>PO# 1</p><p>Address 1 Main St</p><p>Problem: light out</p>",
-    attachments: [],
-    received_at: "2026-09-09T13:12:00.000Z",
+    message_id: `<m-${Math.random()}@test>`, inbox_id: customer.inbox_id,
+    from_email: "dispatch@servicechannel.com", from_name: "ServiceChannel", to: ["service@example.com"],
+    subject: "New Service Request #1", text: null, html: HTML, attachments: [], received_at: "2026-09-09T13:12:00.000Z",
     ...over,
   };
 }
@@ -26,107 +22,113 @@ function email(over: Partial<InboundEmail> = {}): InboundEmail {
 const extracted = {
   reference: { primary: "1", all: [{ label: "PO#", value: "1" }] },
   requester: { organization: "TOPS" },
-  site: { name: null, identifier: null, address: { line1: "1 Main St" }, phone: null },
+  site: { name: null, identifier: null, address: { line1: "1 Main St", city: "Amherst", state: "NY", postal_code: "14228" }, phone: null },
   work: { description: "light out" },
-  priority: { raw: null },
-  deadlines: {},
-  limits: { not_to_exceed: null },
-  extras: {},
-  notes: null,
+  priority: { raw: null }, deadlines: {}, limits: { not_to_exceed: null }, extras: {}, notes: null,
 };
 
-// A fake model: the system prompt tells us which step is calling.
-function fakeChat(opts: { type?: string; extracted?: unknown } = {}): ChatJsonFn {
-  return async (system) => {
-    const isClassify = system.includes("email_type (pick exactly one)");
-    const content = isClassify
-      ? JSON.stringify({ email_type: opts.type ?? "new_request", portal: "servicechannel", confidence: 0.93, reason: "test" })
-      : JSON.stringify(opts.extracted ?? extracted);
-    return { content, model: "fake", usage: null };
+const fakeChat = (data: unknown = extracted): ChatJsonFn => async () => ({ content: JSON.stringify(data), model: "fake-reader", usage: null });
+
+function fakeJev(opts: { type?: string; conf?: number; dispatch?: number; semantic?: Record<string, number> } = {}): AskJevFn {
+  return async (_state, questions) => {
+    const ids = Object.keys(questions);
+    if (ids.includes("email_type")) {
+      return { model: "typesafe-ai/jev", usage: null, answers: {
+        email_type: { type: "choice", choice: opts.type ?? "new_request", confidence: opts.conf ?? 0.96, probabilities: {} },
+        portal: { type: "choice", choice: "servicechannel", confidence: 0.99, probabilities: {} },
+        dispatches_new_work: { type: "boolean", boolean: opts.dispatch ?? 0.94 },
+      } };
+    }
+    return { model: "typesafe-ai/jev", usage: null, answers: Object.fromEntries(ids.map((id) => [id, { type: "boolean" as const, boolean: opts.semantic?.[id] ?? 0.92 }])) };
   };
 }
 
+const quiet = { log: () => {} };
+
 describe("processInbound", () => {
-  it("runs all five steps and produces a ready record", async () => {
+  it("runs every step and produces a ready record", async () => {
     const store = new MemoryStore();
-    const summary = await processInbound(email(), customer, store, { chat: fakeChat(), log: () => {} });
-    expect(summary?.status).toBe("ready");
-    const run = store.runs.get(summary!.run_id)!;
-    expect(run.steps.map((s) => s.name)).toEqual(["received", "cleaned", "classified", "extracted", "checked"]);
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev() });
+    expect(s?.status).toBe("ready");
+    const run = store.runs.get(s!.run_id)!;
+    expect(run.steps.map((x) => x.name)).toEqual(["received", "cleaned", "sorted", "extracted", "verified", "semantic", "checked"]);
     expect(run.record?.reference.primary).toBe("1");
-    expect(run.record?.source.portal).toBe("servicechannel");
-    expect(run.patch?.status).toBe("ready");
+    expect(run.checks).toEqual({ sort: [], verify: [], semantic: [], required: [] });
   });
 
-  it("stops after classification for anything that is not a new request", async () => {
+  it("skips a confident non-request after sorting", async () => {
     const store = new MemoryStore();
-    const summary = await processInbound(email(), customer, store, { chat: fakeChat({ type: "reminder" }), log: () => {} });
-    expect(summary?.status).toBe("skipped");
-    expect(store.runs.get(summary!.run_id)!.steps.map((s) => s.name)).toEqual(["received", "cleaned", "classified"]);
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev({ type: "reminder" }) });
+    expect(s?.status).toBe("skipped");
+    expect(store.runs.get(s!.run_id)!.steps.map((x) => x.name)).toEqual(["received", "cleaned", "sorted"]);
   });
 
-  it("flags missing required fields as needs_review", async () => {
+  it("sends an uncertain sort to a person instead of guessing", async () => {
     const store = new MemoryStore();
-    const noDesc = { ...extracted, work: { description: null } };
-    const summary = await processInbound(email(), customer, store, { chat: fakeChat({ extracted: noDesc }), log: () => {} });
-    expect(summary?.status).toBe("needs_review");
-    expect(summary?.required_missing).toEqual(["work.description"]);
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev({ conf: 0.5 }) });
+    expect(s?.status).toBe("needs_review");
+    expect(s?.checks.sort[0]).toContain("sort_uncertain");
+    expect(s?.record).toBeNull();
+  });
+
+  it("holds a record with an invented address", async () => {
+    const store = new MemoryStore();
+    const bad = { ...extracted, site: { ...extracted.site, address: { ...extracted.site.address, line1: "99 Fake Street" } } };
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat(bad), ask: fakeJev() });
+    expect(s?.status).toBe("needs_review");
+    expect(s?.checks.verify).toEqual(["site.address.line1: not_in_email (99 Fake Street)"]);
+    expect(s?.record).not.toBeNull();
+  });
+
+  it("holds a record when a semantic check falls below the threshold", async () => {
+    const store = new MemoryStore();
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev({ semantic: { address_is_the_site: 0.3 } }) });
+    expect(s?.status).toBe("needs_review");
+    expect(s?.checks.semantic).toEqual(["address_is_the_site: 0.30 (min 0.7)"]);
+  });
+
+  it("holds a record with a missing required field", async () => {
+    const store = new MemoryStore();
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat({ ...extracted, work: { description: null } }), ask: fakeJev() });
+    expect(s?.status).toBe("needs_review");
+    expect(s?.checks.required).toEqual(["work.description"]);
   });
 
   it("records a failed step and finishes the run as failed", async () => {
     const store = new MemoryStore();
-    const badChat: ChatJsonFn = async () => ({ content: "not json", model: "fake", usage: null });
-    const summary = await processInbound(email(), customer, store, { chat: badChat, log: () => {} });
-    expect(summary?.status).toBe("failed");
-    const run = store.runs.get(summary!.run_id)!;
-    expect(run.steps.at(-1)?.name).toBe("classified");
-    expect(run.steps.at(-1)?.status).toBe("failed");
-    expect(run.patch?.status).toBe("failed");
+    const badJev: AskJevFn = async () => { throw new Error("gateway down"); };
+    const s = await processInbound(email(), customer, store, { ...quiet, chat: fakeChat(), ask: badJev });
+    expect(s?.status).toBe("failed");
+    const run = store.runs.get(s!.run_id)!;
+    expect(run.steps.at(-1)).toMatchObject({ name: "sorted", status: "failed" });
   });
 
   it("ignores a duplicate message_id", async () => {
     const store = new MemoryStore();
     const e = email();
-    await processInbound(e, customer, store, { chat: fakeChat(), log: () => {} });
-    const again = await processInbound(e, customer, store, { chat: fakeChat(), log: () => {} });
-    expect(again).toBeNull();
+    await processInbound(e, customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev() });
+    expect(await processInbound(e, customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev() })).toBeNull();
     expect(store.runs.size).toBe(1);
   });
 
   it("fails the cleaned step when the email has no body", async () => {
     const store = new MemoryStore();
-    const summary = await processInbound(email({ html: null, text: "   " }), customer, store, { chat: fakeChat(), log: () => {} });
-    expect(summary?.status).toBe("failed");
-    expect(summary?.error).toContain("no readable body");
+    const s = await processInbound(email({ html: null, text: "   " }), customer, store, { ...quiet, chat: fakeChat(), ask: fakeJev() });
+    expect(s?.status).toBe("failed");
+    expect(s?.error).toContain("no readable body");
   });
-});
 
-describe("per-step model selection", () => {
-  it("passes the configured models to the chat function", async () => {
-    const seen: Array<string | undefined> = [];
-    const chat: ChatJsonFn = async (system, _user, opts) => {
-      seen.push(opts?.model);
-      const isClassify = system.includes("email_type (pick exactly one)");
-      return {
-        content: isClassify
-          ? JSON.stringify({ email_type: "new_request", portal: "heb", confidence: 0.9, reason: "t" })
-          : JSON.stringify(extracted),
-        model: opts?.model ?? "fake",
-        usage: null,
-      };
-    };
-    const store = new MemoryStore();
-    await processInbound(email(), customer, store, { chat, log: () => {}, models: { classify: "model-a", extract: "model-b" } });
-    expect(seen).toEqual(["model-a", "model-b"]);
+  it("passes the configured reader model to the chat function", async () => {
+    let seen: string | undefined;
+    const chat: ChatJsonFn = async (_s, _u, opts) => { seen = opts?.model; return { content: JSON.stringify(extracted), model: opts?.model ?? "fake", usage: null }; };
+    await processInbound(email(), customer, new MemoryStore(), { ...quiet, chat, ask: fakeJev(), models: { extract: "model-b" } });
+    expect(seen).toBe("model-b");
   });
-});
 
-describe("extras tolerance", () => {
   it("drops null and blank extras instead of failing extraction", async () => {
-    const withNulls = { ...extracted, extras: { "Asset Serial Number": null, "Asset Number": "", Department: "Wareroom" } };
-    const store = new MemoryStore();
-    const summary = await processInbound(email(), customer, store, { chat: fakeChat({ extracted: withNulls }), log: () => {} });
-    expect(summary?.status).toBe("ready");
-    expect(summary?.record?.extras).toEqual({ Department: "Wareroom" });
+    const withNulls = { ...extracted, extras: { "Asset Serial Number": null, "Asset Number": "", Customer: "TOPS" } };
+    const s = await processInbound(email(), customer, new MemoryStore(), { ...quiet, chat: fakeChat(withNulls), ask: fakeJev() });
+    expect(s?.status).toBe("ready");
+    expect(s?.record?.extras).toEqual({ Customer: "TOPS" });
   });
 });

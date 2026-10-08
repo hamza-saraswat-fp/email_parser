@@ -28,7 +28,7 @@ export function buildExtractSystemPrompt(): string {
     "category": "category / type if given (e.g. REPAIR, Reactive, Scheduled Maintenance)",
     "area": "area within the site (e.g. BACKROOM, Wareroom, PRODUCE)",
     "asset": "asset / equipment named, if any",
-    "description": "ONLY the free-text problem description / work order description / notes, VERBATIM. Join multiple free-text fields with a blank line. Do NOT prefix it with category or trade labels such as 'PRODUCE > Lighting' or 'Other:' -- those belong in work.area / work.trade. Do not summarize."
+    "description": "ONLY the free-text problem description / work order description / notes, VERBATIM, in the order they appear in the email, separated by a blank line. If the same text appears under more than one label, include it ONCE. Never include label names or category paths such as 'PRODUCE > Lighting' or 'Other:' -- those belong in work.area / work.trade. Do not summarize."
   },
   "priority": {"raw": "priority exactly as written (e.g. 'Scheduled Maintenance', '24 hours (Next Business Day)', 'REGULAR (ON-SITE W/I 48 BUSINESS HOURS)')"},
   "deadlines": {

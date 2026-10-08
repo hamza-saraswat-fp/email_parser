@@ -1,7 +1,7 @@
 // In-memory RunStore for the replay script and tests. Nothing persists.
 import { randomUUID } from "node:crypto";
 import type { ServiceRequest } from "../schema/record.js";
-import type { InboundEmail, RunPatch, RunStore, StepRow } from "./types.js";
+import type { CheckResults, InboundEmail, RunPatch, RunStore, StepRow } from "./types.js";
 
 export interface MemoryRun {
   id: string;
@@ -10,7 +10,7 @@ export interface MemoryRun {
   patch: RunPatch | null;
   steps: StepRow[];
   record: ServiceRequest | null;
-  required_missing: string[];
+  checks: CheckResults | null;
 }
 
 export class MemoryStore implements RunStore {
@@ -26,7 +26,7 @@ export class MemoryStore implements RunStore {
   }
   async createRun(emailId: string, customerId: string) {
     const id = randomUUID();
-    this.runs.set(id, { id, email_id: emailId, customer_id: customerId, patch: null, steps: [], record: null, required_missing: [] });
+    this.runs.set(id, { id, email_id: emailId, customer_id: customerId, patch: null, steps: [], record: null, checks: null });
     return id;
   }
   async addStep(runId: string, step: StepRow) {
@@ -35,9 +35,9 @@ export class MemoryStore implements RunStore {
   async finishRun(runId: string, patch: RunPatch) {
     this.runs.get(runId)!.patch = patch;
   }
-  async storeRecord(runId: string, _customerId: string, record: ServiceRequest, requiredMissing: string[]) {
+  async storeRecord(runId: string, _customerId: string, record: ServiceRequest, checks: CheckResults) {
     const run = this.runs.get(runId)!;
     run.record = record;
-    run.required_missing = requiredMissing;
+    run.checks = checks;
   }
 }

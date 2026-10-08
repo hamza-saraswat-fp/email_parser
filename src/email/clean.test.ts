@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanEmail, normalizeWhitespace } from "./clean.js";
+import { cleanEmail, normalizeWhitespace, focusBody } from "./clean.js";
 
 describe("cleanEmail", () => {
   it("prefers html and keeps label/value text while dropping links, images and styles", () => {
@@ -36,5 +36,15 @@ describe("cleanEmail", () => {
 describe("normalizeWhitespace", () => {
   it("collapses runs of blank lines and trailing spaces", () => {
     expect(normalizeWhitespace("a  \n\n\n\nb\t c\n")).toBe("a\n\nb c");
+  });
+});
+
+describe("focusBody", () => {
+  it("keeps the text from the last forwarded-message marker", () => {
+    const body = "John sig\n---------- Forwarded message ---------\nFrom: Solis\nFrom Service Channel\n---------- Forwarded message ---------\nFrom: ServiceChannel\nNew Service Request";
+    expect(focusBody(body)).toBe("---------- Forwarded message ---------\nFrom: ServiceChannel\nNew Service Request");
+  });
+  it("returns the body unchanged without a marker", () => {
+    expect(focusBody("plain\nemail")).toBe("plain\nemail");
   });
 });
