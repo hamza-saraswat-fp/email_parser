@@ -36,6 +36,12 @@ Real emails: in Gmail open the message, "Show original", "Download original", sa
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Shared FieldPulse Supabase project; tables are prefixed `parser_` |
 | `PARSER_INBOX_IDS` | Comma-separated inbox ids to subscribe to; each must have a `parser_customers` row |
 | `PORT` | HTTP port (default 3000) |
+| `FP_AUTH_URL` | Universal Auth project URL. When set, every `/api` call needs a FieldPulse-issued token. Unset = open API (local only). |
+| `VITE_FP_AUTH_URL`, `VITE_FP_AUTH_PUBLISHABLE_KEY` | Same project, for the browser. Baked in at build time. Unset = no sign-in screen (local only). |
+
+## Sign-in
+
+Production uses [Universal Auth](https://github.com/hamza-saraswat-fp/Universal_auth): anyone with a FieldPulse Google account can open the page, and the API verifies the token on every call. The production domain must be on the auth project's redirect allow-list (`https://<domain>/**`).
 
 ## Database
 

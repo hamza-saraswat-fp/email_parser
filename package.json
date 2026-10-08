@@ -19,6 +19,7 @@
     "create-inbox": "tsx scripts/create-inbox.ts"
   },
   "dependencies": {
+    "@fieldpulse/auth": "github:hamza-saraswat-fp/Universal_auth#v0.4.0",
     "@supabase/supabase-js": "^2.49.0",
     "agentmail": "^0.4.12",
     "dotenv": "^16.4.7",

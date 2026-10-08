@@ -40,8 +40,10 @@ export interface RunDetail extends Omit<RunListItem, "email"> {
   record: { record: unknown; required_missing: string[] } | null;
 }
 
+import { authHeaders } from "./auth";
+
 async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: await authHeaders() });
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   return res.json() as Promise<T>;
 }

@@ -12,6 +12,9 @@ const envSchema = z.object({
     .min(1, "PARSER_INBOX_IDS is required")
     .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
   PORT: z.coerce.number().default(3000),
+  // Universal Auth (fieldpulse-auth). When set, every /api call must carry a
+  // FieldPulse-issued token. Unset = open API, for local dev and tests only.
+  FP_AUTH_URL: z.string().url().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

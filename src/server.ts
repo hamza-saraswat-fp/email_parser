@@ -1,10 +1,21 @@
 import express from "express";
 import path from "node:path";
+import { configureAuth } from "@fieldpulse/auth";
+import { config } from "./config.js";
+import { createAuthMiddleware } from "./auth.js";
 import { listRuns, getRun } from "./db/runs.js";
 import { listCustomers } from "./db/customers.js";
 
 export const app = express();
 app.use(express.json());
+
+if (config.FP_AUTH_URL) {
+  configureAuth({ url: config.FP_AUTH_URL });
+  app.use("/api", createAuthMiddleware());
+  console.log(`[AUTH] FieldPulse sign-in required on /api (${config.FP_AUTH_URL})`);
+} else {
+  console.warn("[AUTH] FP_AUTH_URL is not set -- the API is open. Fine locally, never in production.");
+}
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
