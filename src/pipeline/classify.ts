@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { emailTypeSchema, portalSchema } from "../schema/record.js";
 import { chatJson, stripFences, type ChatJsonFn } from "../llm/openrouter.js";
+import { config } from "../config.js";
 
 export const classificationSchema = z.object({
   email_type: emailTypeSchema,
@@ -41,8 +42,9 @@ export function buildClassifyUserMessage(input: {
 export async function classifyEmail(
   input: { from: string | null; subject: string | null; body: string; portalHint: string | null },
   chat: ChatJsonFn = chatJson,
+  modelId: string = config.OPENROUTER_MODEL_CLASSIFY,
 ): Promise<{ result: Classification; model: string }> {
-  const { content, model } = await chat(buildClassifySystemPrompt(), buildClassifyUserMessage(input));
+  const { content, model } = await chat(buildClassifySystemPrompt(), buildClassifyUserMessage(input), { model: modelId });
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripFences(content));

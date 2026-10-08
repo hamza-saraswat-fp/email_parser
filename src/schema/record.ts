@@ -72,10 +72,16 @@ export const extractedSchema = z.object({
       .nullish()
       .transform((v) => v ?? null),
   }),
+  // Models emit null (or "") for a labelled-but-blank field such as "Asset
+  // Serial Number:". Drop those rather than failing the whole extraction.
   extras: z
-    .record(z.string())
+    .record(z.string().nullable())
     .nullish()
-    .transform((v) => v ?? {}),
+    .transform((v) => {
+      const out: Record<string, string> = {};
+      for (const [k, val] of Object.entries(v ?? {})) if (val && val.trim()) out[k] = val.trim();
+      return out;
+    }),
   notes: ns,
 });
 export type Extracted = z.infer<typeof extractedSchema>;

@@ -1,20 +1,31 @@
-// Run the pipeline on a .eml file. No AgentMail, no database (unless --db).
+// Run the pipeline on .eml files. No AgentMail, no database (unless --db).
 //
 //   npm run replay -- fixtures/emails/servicechannel.eml
-//   npm run replay -- fixtures/emails/*.eml --db      # also write to Supabase as customer "dev"
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+//   npm run replay -- fixtures/emails/*.eml --db                    # also write to Supabase as customer "dev"
+//   npm run replay -- fixtures/emails/*.eml --classify-model anthropic/claude-haiku-5.5 \
+//                     --extract-model anthropic/claude-sonnet-5.5 --out tmp/models/try1
+//
+// --out writes one JSON per email (summary, steps with timings, record) so two
+// runs can be diffed with scripts/compare-records.ts.
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { basename, join } from "node:path";
 import PostalMime from "postal-mime";
 import { processInbound } from "../src/pipeline/run.js";
 import { MemoryStore } from "../src/pipeline/memory-store.js";
 import { DEFAULT_REQUIRED_FIELDS } from "../src/schema/record.js";
 import type { Customer, InboundEmail, RunStore } from "../src/pipeline/types.js";
 
-const args = process.argv.slice(2);
-const useDb = args.includes("--db");
-const files = args.filter((a) => !a.startsWith("--"));
+const argv = process.argv.slice(2);
+function flag(name: string): string | undefined {
+  const i = argv.indexOf(name);
+  return i >= 0 ? argv[i + 1] : undefined;
+}
+const useDb = argv.includes("--db");
+const outDir = flag("--out");
+const models = { classify: flag("--classify-model"), extract: flag("--extract-model") };
+const files = argv.filter((a, i) => !a.startsWith("--") && !["--out", "--classify-model", "--extract-model"].includes(argv[i - 1] ?? ""));
 if (!files.length) {
-  console.error("usage: npm run replay -- <file.eml> [more.eml ...] [--db]");
+  console.error("usage: npm run replay -- <file.eml> [more.eml ...] [--db] [--out dir] [--classify-model id] [--extract-model id]");
   process.exit(1);
 }
 
@@ -55,19 +66,32 @@ if (useDb) {
 } else {
   store = new MemoryStore();
 }
+if (outDir) await mkdir(outDir, { recursive: true });
 
 for (const file of files) {
   console.log(`\n=== ${file} ===`);
   const email = await emlToInbound(file);
-  const summary = await processInbound(email, customer, store);
+  const summary = await processInbound(email, customer, store, { models });
   if (!summary) continue;
-  if (!useDb) {
-    const run = (store as MemoryStore).runs.get(summary.run_id)!;
+  const run = useDb ? null : (store as MemoryStore).runs.get(summary.run_id)!;
+  if (run) {
     for (const s of run.steps) {
-      console.log(`  ${s.position}. ${s.name.padEnd(10)} ${s.status.padEnd(7)} ${s.duration_ms}ms${s.error ? `  ${s.error}` : ""}`);
+      const model = (s.output as { model?: string } | null)?.model;
+      console.log(`  ${s.position}. ${s.name.padEnd(10)} ${s.status.padEnd(7)} ${String(s.duration_ms).padStart(5)}ms${model ? `  ${model}` : ""}${s.error ? `  ${s.error}` : ""}`);
     }
   }
   console.log(`status: ${summary.status}  type: ${summary.email_type}  portal: ${summary.portal}`);
   if (summary.required_missing.length) console.log(`missing: ${summary.required_missing.join(", ")}`);
-  if (summary.record) console.log(JSON.stringify(summary.record, null, 2));
+  if (summary.record && !outDir) console.log(JSON.stringify(summary.record, null, 2));
+  if (outDir) {
+    const out = {
+      file,
+      summary: { status: summary.status, email_type: summary.email_type, portal: summary.portal, required_missing: summary.required_missing, error: summary.error },
+      steps: (run?.steps ?? []).map((s) => ({ name: s.name, status: s.status, duration_ms: s.duration_ms, model: (s.output as { model?: string } | null)?.model ?? null })),
+      record: summary.record,
+    };
+    const target = join(outDir, basename(file).replace(/\.eml$/i, "") + ".json");
+    await writeFile(target, JSON.stringify(out, null, 2));
+    console.log(`wrote ${target}`);
+  }
 }

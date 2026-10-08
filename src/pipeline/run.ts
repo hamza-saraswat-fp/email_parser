@@ -17,6 +17,8 @@ import type { Customer, InboundEmail, RunStore, RunSummary, StepRow } from "./ty
 export interface PipelineDeps {
   chat?: ChatJsonFn;
   log?: (line: string) => void;
+  // Per-step model overrides (replay comparisons). Unset = config defaults.
+  models?: { classify?: string; extract?: string };
 }
 
 class StepFailed extends Error {
@@ -89,6 +91,7 @@ export async function processInbound(
       const { result, model } = await classifyEmail(
         { from: email.from_email, subject: email.subject, body: cleaned.body, portalHint },
         deps.chat,
+        deps.models?.classify,
       );
       return { ...result, model };
     });
@@ -106,6 +109,7 @@ export async function processInbound(
       const { result, model, usage } = await extractRecord(
         { from: email.from_email, subject: email.subject, receivedAt: email.received_at, body: cleaned.body, portalHint: portal },
         deps.chat,
+        deps.models?.extract,
       );
       return { model, usage, extracted: result };
     });

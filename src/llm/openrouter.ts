@@ -12,11 +12,16 @@ export interface ChatJsonResult {
   usage: { prompt_tokens?: number; completion_tokens?: number } | null;
 }
 
-export type ChatJsonFn = (system: string, user: string) => Promise<ChatJsonResult>;
+export interface ChatJsonOptions {
+  model?: string;
+}
 
-export const chatJson: ChatJsonFn = async (system, user) => {
+export type ChatJsonFn = (system: string, user: string, opts?: ChatJsonOptions) => Promise<ChatJsonResult>;
+
+export const chatJson: ChatJsonFn = async (system, user, opts = {}) => {
+  const model = opts.model ?? config.OPENROUTER_MODEL;
   const body = JSON.stringify({
-    model: config.OPENROUTER_MODEL,
+    model,
     temperature: 0,
     response_format: { type: "json_object" },
     messages: [
@@ -52,7 +57,7 @@ export const chatJson: ChatJsonFn = async (system, user) => {
         };
         return {
           content: json.choices?.[0]?.message?.content ?? "",
-          model: json.model ?? config.OPENROUTER_MODEL,
+          model: json.model ?? model,
           usage: json.usage ?? null,
         };
       }

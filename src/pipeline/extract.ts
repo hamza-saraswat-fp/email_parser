@@ -2,6 +2,7 @@
 // One general reader for any portal; no template per portal.
 import { extractedSchema, type Extracted } from "../schema/record.js";
 import { chatJson, stripFences, type ChatJsonFn } from "../llm/openrouter.js";
+import { config } from "../config.js";
 
 export function buildExtractSystemPrompt(): string {
   return `You extract structured data from ONE work-order / service-request email sent to a field-service contractor by a portal (ServiceChannel, Corrigo, H-E-B My Facility, FEXA, ServicePower, or similar). The layout and labels differ by portal; the information is the same. Return STRICT JSON only, matching the shape below exactly. Use null for anything the email does not state. NEVER invent, guess, or rewrite a value: copy text exactly as written (trim surrounding whitespace only).
@@ -67,8 +68,9 @@ export function buildExtractUserMessage(input: {
 export async function extractRecord(
   input: { from: string | null; subject: string | null; receivedAt: string; body: string; portalHint: string | null },
   chat: ChatJsonFn = chatJson,
+  modelId: string = config.OPENROUTER_MODEL_EXTRACT,
 ): Promise<{ result: Extracted; model: string; usage: unknown }> {
-  const { content, model, usage } = await chat(buildExtractSystemPrompt(), buildExtractUserMessage(input));
+  const { content, model, usage } = await chat(buildExtractSystemPrompt(), buildExtractUserMessage(input), { model: modelId });
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripFences(content));

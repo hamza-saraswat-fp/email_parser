@@ -23,6 +23,8 @@ Replay an email without AgentMail or a database:
 ```bash
 npm run replay -- fixtures/emails/sample-servicechannel.eml
 npm run replay -- fixtures/emails/*.eml --db     # also writes runs to Supabase as customer "dev"
+npm run replay -- fixtures/emails/*.eml --classify-model anthropic/claude-haiku-5.5 --extract-model anthropic/claude-sonnet-5.5 --out tmp/models/try1
+npm run compare -- tmp/models/baseline tmp/models/try1   # field-by-field diff of two replay outputs
 ```
 
 Real emails: in Gmail open the message, "Show original", "Download original", save as `fixtures/emails/<name>.eml`. That folder is gitignored (the repo is public).
@@ -32,6 +34,7 @@ Real emails: in Gmail open the message, "Show original", "Download original", sa
 | Variable | What |
 |---|---|
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Model calls (OpenAI-compatible), same as the support agent |
+| `OPENROUTER_MODEL_CLASSIFY`, `OPENROUTER_MODEL_EXTRACT` | Optional per-step models (sort vs read). Unset = `OPENROUTER_MODEL`. |
 | `AGENTMAIL_API_KEY` | AgentMail; inboxes live on the verified `agent.fieldpulse.com` domain |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Shared FieldPulse Supabase project; tables are prefixed `parser_` |
 | `PARSER_INBOX_IDS` | Comma-separated inbox ids to subscribe to; each must have a `parser_customers` row |

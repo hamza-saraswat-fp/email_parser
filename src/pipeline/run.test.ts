@@ -100,3 +100,33 @@ describe("processInbound", () => {
     expect(summary?.error).toContain("no readable body");
   });
 });
+
+describe("per-step model selection", () => {
+  it("passes the configured models to the chat function", async () => {
+    const seen: Array<string | undefined> = [];
+    const chat: ChatJsonFn = async (system, _user, opts) => {
+      seen.push(opts?.model);
+      const isClassify = system.includes("email_type (pick exactly one)");
+      return {
+        content: isClassify
+          ? JSON.stringify({ email_type: "new_request", portal: "heb", confidence: 0.9, reason: "t" })
+          : JSON.stringify(extracted),
+        model: opts?.model ?? "fake",
+        usage: null,
+      };
+    };
+    const store = new MemoryStore();
+    await processInbound(email(), customer, store, { chat, log: () => {}, models: { classify: "model-a", extract: "model-b" } });
+    expect(seen).toEqual(["model-a", "model-b"]);
+  });
+});
+
+describe("extras tolerance", () => {
+  it("drops null and blank extras instead of failing extraction", async () => {
+    const withNulls = { ...extracted, extras: { "Asset Serial Number": null, "Asset Number": "", Department: "Wareroom" } };
+    const store = new MemoryStore();
+    const summary = await processInbound(email(), customer, store, { chat: fakeChat({ extracted: withNulls }), log: () => {} });
+    expect(summary?.status).toBe("ready");
+    expect(summary?.record?.extras).toEqual({ Department: "Wareroom" });
+  });
+});

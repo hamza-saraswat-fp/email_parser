@@ -4,6 +4,9 @@ import { z } from "zod";
 const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   OPENROUTER_MODEL: z.string().default("anthropic/claude-sonnet-4"),
+  // Per-step overrides. Unset = use OPENROUTER_MODEL for that step.
+  OPENROUTER_MODEL_CLASSIFY: z.string().optional(),
+  OPENROUTER_MODEL_EXTRACT: z.string().optional(),
   AGENTMAIL_API_KEY: z.string().min(1, "AGENTMAIL_API_KEY is required"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -27,4 +30,8 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const config = parsed.data;
+export const config = {
+  ...parsed.data,
+  OPENROUTER_MODEL_CLASSIFY: parsed.data.OPENROUTER_MODEL_CLASSIFY ?? parsed.data.OPENROUTER_MODEL,
+  OPENROUTER_MODEL_EXTRACT: parsed.data.OPENROUTER_MODEL_EXTRACT ?? parsed.data.OPENROUTER_MODEL,
+};
