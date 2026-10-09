@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import { createAuthMiddleware } from "./auth.js";
 import { listRuns, getRun, reviewRun } from "./db/runs.js";
 import { listCustomers } from "./db/customers.js";
+import { deliverRun, fieldPulseConfigured } from "./fieldpulse/service.js";
 
 export const app = express();
 app.use(express.json());
@@ -47,7 +48,9 @@ app.get("/api/runs/:id", async (req, res) => {
 });
 
 // Review: approve or reject. The reviewer is the signed-in FieldPulse user when
-// auth is on; "local" when the API is open (dev only).
+// auth is on; "local" when the API is open (dev only). Approving is the only
+// trigger for delivery into FieldPulse: approve -> deliver -> delivered or
+// delivery_failed. A failed delivery can be retried with /deliver.
 for (const decision of ["approved", "rejected"] as const) {
   app.post(`/api/runs/:id/${decision === "approved" ? "approve" : "reject"}`, async (req, res) => {
     try {
@@ -55,12 +58,30 @@ for (const decision of ["approved", "rejected"] as const) {
       const note = typeof req.body?.note === "string" && req.body.note.trim() ? req.body.note.trim().slice(0, 2000) : null;
       const result = await reviewRun(req.params.id, decision, reviewer, note);
       if (!result.ok) return res.status(result.reason === "not found" ? 404 : 409).json({ error: result.reason });
+      if (decision === "approved" && fieldPulseConfigured()) {
+        try {
+          const delivery = await deliverRun(req.params.id);
+          return res.json({ ok: true, status: "delivered", reviewed_by: reviewer, delivery });
+        } catch (err) {
+          return res.status(502).json({ ok: false, status: "delivery_failed", reviewed_by: reviewer, error: (err as Error).message });
+        }
+      }
       res.json({ ok: true, status: decision, reviewed_by: reviewer });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
   });
 }
+
+app.post("/api/runs/:id/deliver", async (req, res) => {
+  try {
+    if (!fieldPulseConfigured()) return res.status(503).json({ error: "FieldPulse delivery is not configured" });
+    const delivery = await deliverRun(req.params.id);
+    res.json({ ok: true, status: "delivered", delivery });
+  } catch (err) {
+    res.status(502).json({ ok: false, status: "delivery_failed", error: (err as Error).message });
+  }
+});
 
 // Serve the built frontend when it exists (production).
 const frontendDist = path.join(import.meta.dirname, "../frontend/dist");

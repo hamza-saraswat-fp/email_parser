@@ -15,6 +15,9 @@ Portal service-request emails in, universal service-request records out. See REA
 - **Models propose; code decides.** The reader's output never reaches `ready` without the verify step (every value found in the email) and the semantic step. Never relax a check to make a run pass; fix the prompt or the criteria, then prove it with `npm run eval`.
 - **`npm run eval` before deploying** any change to a prompt, a model, a threshold or Jev criteria. Expected files live in `fixtures/expected/` (gitignored, same data as the emails).
 
+- **Delivery is approval-only and idempotent.** Nothing is created in FieldPulse without a person approving; a reference number is created at most once per customer (`parser_deliveries` unique index plus the job search). Never add an automatic delivery path without Hamza's say-so.
+- **FieldPulse facts come from the `development` branch** of Flicent/backend_2.0, not master or the stale local checkout. Confirm a new endpoint with a read-only call (`npm run fp:check` pattern) before relying on it.
+
 ## Out of scope for V1
 
-FieldPulse API calls, customer matching, accept/decline, attachment parsing, Slack, per-customer config UI.
+Accept/decline in portals, attachment parsing, Slack, per-customer config UI, FieldPulse writes other than customer / location / job.

@@ -1,4 +1,16 @@
-export type RunStatus = "running" | "ready" | "needs_review" | "skipped" | "failed" | "approved" | "rejected";
+export type RunStatus = "running" | "ready" | "needs_review" | "skipped" | "failed" | "approved" | "rejected" | "delivering" | "delivered" | "delivery_failed";
+
+export interface Delivery {
+  status: "delivered" | "failed";
+  fp_customer_id: number | null;
+  fp_location_id: number | null;
+  fp_job_id: number | null;
+  fp_job_cuid: string | null;
+  created_customer: boolean;
+  created_location: boolean;
+  error: string | null;
+  created_at: string;
+}
 
 export interface CheckResults { sort: string[]; verify: string[]; semantic: string[]; required: string[] }
 
@@ -45,6 +57,7 @@ export interface RunDetail extends Omit<RunListItem, "email"> {
   steps: RunStep[];
   record: { record: unknown; required_missing: CheckResults | string[] } | null;
   review_note?: string | null;
+  delivery?: Delivery | null;
 }
 
 import { authHeaders } from "./auth";
@@ -65,8 +78,9 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 export const api = {
   runs: (limit = 50) => get<RunListItem[]>(`/api/runs?limit=${limit}`),
   run: (id: string) => get<RunDetail>(`/api/runs/${id}`),
-  approve: (id: string, note: string) => post<{ ok: true }>(`/api/runs/${id}/approve`, { note }),
-  reject: (id: string, note: string) => post<{ ok: true }>(`/api/runs/${id}/reject`, { note }),
+  approve: (id: string, note: string) => post<{ ok: boolean; status: string }>(`/api/runs/${id}/approve`, { note }),
+  reject: (id: string, note: string) => post<{ ok: boolean; status: string }>(`/api/runs/${id}/reject`, { note }),
+  deliver: (id: string) => post<{ ok: boolean; status: string }>(`/api/runs/${id}/deliver`, {}),
 };
 
 // Checks failed, flattened for display. Older rows stored a plain string list.

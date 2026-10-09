@@ -5,7 +5,7 @@ Reads service-request emails that work-order portals (ServiceChannel, Corrigo, H
 ```
 Portal --> customer's mailbox --(auto-forward)--> AgentMail inbox --> this service
    received -> cleaned -> sorted (Jev) -> read (Sonnet) -> verified (code) -> semantic (Jev) -> required fields
-   -> ready | needs_review -> a person approves -> approved
+   -> ready | needs_review -> a person approves -> job created in FieldPulse (delivered)
    every step stored, visible at /runs
 ```
 
@@ -45,6 +45,7 @@ Real emails: in Gmail open the message, "Show original", "Download original", sa
 | `AI_GATEWAY_API_KEY`, `JEV_MODEL` | Jev (TypeSafe) through the Vercel AI Gateway: sorting and semantic checks, zero data retention requested. |
 | `JEV_SORT_MIN_CONFIDENCE` | Below this, a sort result goes to a person instead of being acted on (default 0.7). |
 | `JEV_CHECK_MIN` | Below this, a semantic check fails and the run goes to a person (default 0.7). |
+| `FP_API_BASE_URL`, `FP_API_KEY`, `FP_COMPANY_ID` | FieldPulse external API. The key is one FieldPulse user's api_token; `FP_COMPANY_ID` is a guard -- delivery is disabled if the key belongs to another company. Unset key = delivery off. |
 | `AGENTMAIL_API_KEY` | AgentMail; inboxes live on the verified `agent.fieldpulse.com` domain |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Shared FieldPulse Supabase project; tables are prefixed `parser_` |
 | `PARSER_INBOX_IDS` | Comma-separated inbox ids to subscribe to; each must have a `parser_customers` row |
@@ -52,13 +53,24 @@ Real emails: in Gmail open the message, "Show original", "Download original", sa
 | `FP_AUTH_URL` | Universal Auth project URL. When set, every `/api` call needs a FieldPulse-issued token. Unset = open API (local only). |
 | `VITE_FP_AUTH_URL`, `VITE_FP_AUTH_PUBLISHABLE_KEY` | Same project, for the browser. Baked in at build time. Unset = no sign-in screen (local only). |
 
+## FieldPulse delivery
+
+Approving a run creates the job. `src/fieldpulse/`: `client.ts` (envelope, retries), `mapping.ts` (record -> customer / location / job payloads), `setup.ts` (the five job custom fields, created once per company), `deliver.ts` (find-or-create customer and store location, create the job, idempotent on the reference number), `service.ts` (approve -> deliver -> `delivered` / `delivery_failed`).
+
+```bash
+npm run fp:check                                   # read-only: key, company, role, custom fields, workflows
+npm run fp:setup -- --live                         # create the parser's job custom fields (idempotent)
+npm run fp:deliver -- fixtures/emails/heb.eml      # dry run: prints the payloads
+npm run fp:deliver -- fixtures/emails/heb.eml --live
+```
+
 ## Sign-in
 
 Production uses [Universal Auth](https://github.com/hamza-saraswat-fp/Universal_auth): anyone with a FieldPulse Google account can open the page, and the API verifies the token on every call. The production domain must be on the auth project's redirect allow-list (`https://<domain>/**`).
 
 ## Database
 
-Apply the migrations in order (`supabase/migrations/001_parser.sql`, `002_review.sql`) in the SQL editor. They are idempotent. 001 seeds three customers: `dev`, `demo`, `solis`.
+Apply the migrations in order (`supabase/migrations/001_parser.sql`, `002_review.sql`, `003_delivery.sql`) in the SQL editor. They are idempotent. 001 seeds three customers: `dev`, `demo`, `solis`.
 
 ## Inboxes
 

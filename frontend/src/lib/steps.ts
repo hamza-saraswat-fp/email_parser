@@ -12,10 +12,11 @@ export const STEP_LABELS: Record<string, string> = {
   verified: "Verified",
   semantic: "Semantic (Jev)",
   checked: "Required",
+  delivered: "FieldPulse",
 };
 
 export const STEP_KIND: Record<string, "code" | "model"> = {
-  received: "code", cleaned: "code", classified: "model", sorted: "model", extracted: "model", verified: "code", semantic: "model", checked: "code",
+  received: "code", cleaned: "code", classified: "model", sorted: "model", extracted: "model", verified: "code", semantic: "model", checked: "code", delivered: "code",
 };
 
 // Why a step did not run, given the run's final status and the last step seen.

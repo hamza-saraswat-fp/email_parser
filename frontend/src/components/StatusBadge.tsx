@@ -5,6 +5,9 @@ const STYLES: Record<string, string> = {
   skipped: "bg-slate-200 text-slate-700",
   failed: "bg-red-100 text-red-800",
   approved: "bg-emerald-200 text-emerald-900",
+  delivering: "bg-blue-100 text-blue-800",
+  delivered: "bg-emerald-600 text-white",
+  delivery_failed: "bg-red-200 text-red-900",
   rejected: "bg-rose-200 text-rose-900",
   ok: "bg-green-100 text-green-800",
 };

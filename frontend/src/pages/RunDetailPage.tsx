@@ -117,14 +117,16 @@ export function RunDetailPage({ id }: { id: string }) {
   const [note, setNote] = useState("");
   const qc = useQueryClient();
   const review = useMutation({
-    mutationFn: ({ decision }: { decision: "approve" | "reject" }) => (decision === "approve" ? api.approve(id, note) : api.reject(id, note)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["run", id] }); qc.invalidateQueries({ queryKey: ["runs"] }); },
+    mutationFn: ({ decision }: { decision: "approve" | "reject" | "deliver" }) =>
+      decision === "approve" ? api.approve(id, note) : decision === "reject" ? api.reject(id, note) : api.deliver(id),
+    onSettled: () => { qc.invalidateQueries({ queryKey: ["run", id] }); qc.invalidateQueries({ queryKey: ["runs"] }); },
   });
 
   if (isLoading) return <div className="text-sm text-slate-500">Loading…</div>;
   if (error || !data) return <div className="text-sm text-red-700">{String(error ?? "not found")}</div>;
   const failed = failedChecks(data.record?.required_missing);
   const reviewable = data.status === "ready" || data.status === "needs_review";
+  const retryable = data.status === "delivery_failed";
 
   return (
     <div className="space-y-5">
@@ -173,7 +175,7 @@ export function RunDetailPage({ id }: { id: string }) {
               disabled={review.isPending}
               className="rounded bg-emerald-700 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
             >
-              Approve
+              {review.isPending ? "Creating job…" : "Approve & create job"}
             </button>
             <button
               onClick={() => review.mutate({ decision: "reject" })}
@@ -183,6 +185,28 @@ export function RunDetailPage({ id }: { id: string }) {
               Reject
             </button>
             {review.error && <span className="text-sm text-red-700">{String((review.error as Error).message)}</span>}
+          </div>
+        )}
+        {(data.delivery || retryable) && (
+          <div className={`mt-4 rounded border p-3 text-sm ${data.delivery?.status === "delivered" ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">FieldPulse</div>
+            {data.delivery?.status === "delivered" ? (
+              <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                <div><span className="text-slate-500">Job</span> #{data.delivery.fp_job_cuid ?? data.delivery.fp_job_id} <span className="text-xs text-slate-400">(id {data.delivery.fp_job_id})</span></div>
+                <div><span className="text-slate-500">Created</span> {new Date(data.delivery.created_at).toLocaleString()}</div>
+                <div><span className="text-slate-500">Customer</span> #{data.delivery.fp_customer_id}{data.delivery.created_customer ? " (new)" : " (existing)"}</div>
+                <div><span className="text-slate-500">Location</span> {data.delivery.fp_location_id ? `#${data.delivery.fp_location_id}${data.delivery.created_location ? " (new)" : " (existing)"}` : "—"}</div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-red-800">{data.delivery?.error ?? data.error ?? "delivery failed"}</span>
+                {retryable && (
+                  <button onClick={() => review.mutate({ decision: "deliver" })} disabled={review.isPending} className="rounded border border-slate-300 bg-white px-3 py-1 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+                    {review.isPending ? "Retrying…" : "Retry delivery"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

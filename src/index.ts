@@ -6,6 +6,7 @@ import { SupabaseStore } from "./db/store.js";
 import { getCustomerByInbox } from "./db/customers.js";
 import { supabase } from "./db/client.js";
 import type { InboundEmail } from "./pipeline/types.js";
+import { verifyFieldPulseCompany } from "./fieldpulse/service.js";
 
 console.log("email_parser starting...");
 console.log(`  Models: sort+checks=${config.JEV_MODEL} (min ${config.JEV_SORT_MIN_CONFIDENCE}/${config.JEV_CHECK_MIN})  read=${config.OPENROUTER_MODEL_EXTRACT}`);
@@ -28,6 +29,8 @@ async function emailExists(messageId: string): Promise<boolean> {
   const { data } = await supabase.from("parser_emails").select("id").eq("message_id", messageId).maybeSingle();
   return Boolean(data);
 }
+
+void verifyFieldPulseCompany();
 
 const server = app.listen(config.PORT, () => {
   console.log(`[HTTP] API listening on port ${config.PORT}`);

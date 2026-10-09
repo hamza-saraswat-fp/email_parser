@@ -32,7 +32,7 @@ export async function listRuns(limit = 50) {
 }
 
 export async function getRun(id: string) {
-  const [run, steps, record] = await Promise.all([
+  const [run, steps, record, delivery] = await Promise.all([
     supabase
       .from("parser_runs")
       .select("*, parser_emails(*)")
@@ -40,13 +40,14 @@ export async function getRun(id: string) {
       .maybeSingle(),
     supabase.from("parser_run_steps").select("*").eq("run_id", id).order("position"),
     supabase.from("parser_records").select("*").eq("run_id", id).maybeSingle(),
+    supabase.from("parser_deliveries").select("*").eq("run_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (run.error) throw new Error(`parser_runs get: ${run.error.message}`);
   if (!run.data) return null;
   if (steps.error) throw new Error(`parser_run_steps get: ${steps.error.message}`);
   if (record.error) throw new Error(`parser_records get: ${record.error.message}`);
   const { parser_emails, ...rest } = run.data as Record<string, unknown> & { parser_emails: unknown };
-  return { ...rest, email: parser_emails, steps: steps.data ?? [], record: record.data ?? null };
+  return { ...rest, email: parser_emails, steps: steps.data ?? [], record: record.data ?? null, delivery: delivery.error ? null : delivery.data ?? null };
 }
 
 // A person's decision. Allowed from ready or needs_review only; anything else
@@ -56,7 +57,9 @@ export async function reviewRun(id: string, decision: "approved" | "rejected", r
   const { data: run, error: lookupErr } = await supabase.from("parser_runs").select("status").eq("id", id).maybeSingle();
   if (lookupErr) throw new Error(`parser_runs get: ${lookupErr.message}`);
   if (!run) return { ok: false as const, reason: "not found" };
-  if (run.status !== "ready" && run.status !== "needs_review") return { ok: false as const, reason: `cannot review a run in status ${run.status}` };
+  if (run.status !== "ready" && run.status !== "needs_review" && !(decision === "approved" && run.status === "delivery_failed")) {
+    return { ok: false as const, reason: `cannot review a run in status ${run.status}` };
+  }
   const { error } = await supabase
     .from("parser_runs")
     .update({ status: decision, reviewed_by: reviewer, reviewed_at: new Date().toISOString(), review_note: note })

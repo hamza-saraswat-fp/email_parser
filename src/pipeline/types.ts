@@ -41,7 +41,7 @@ export interface StepRow {
   duration_ms: number;
 }
 
-export type RunStatus = "running" | "ready" | "needs_review" | "skipped" | "failed" | "approved" | "rejected";
+export type RunStatus = "running" | "ready" | "needs_review" | "skipped" | "failed" | "approved" | "rejected" | "delivering" | "delivered" | "delivery_failed";
 
 // Everything that can send a run to a person, kept apart so the reviewer sees
 // each kind on its own.

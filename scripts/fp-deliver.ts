@@ -6,7 +6,7 @@ import { config } from "../src/config.js";
 import { FieldPulseClient } from "../src/fieldpulse/client.js";
 import { ensureJobCustomFields } from "../src/fieldpulse/setup.js";
 import { customerPayload, locationPayload, jobPayload, type FieldIds } from "../src/fieldpulse/mapping.js";
-import { deliverRecord, MemoryDeliveryStore, type DeliveryStore } from "../src/fieldpulse/deliver.js";
+import { deliverRecord, MemoryDeliveryStore, CUSTOMER_MORPH_CLASS, type DeliveryStore } from "../src/fieldpulse/deliver.js";
 import { serviceRequestSchema, DEFAULT_REQUIRED_FIELDS, type ServiceRequest } from "../src/schema/record.js";
 import { processInbound } from "../src/pipeline/run.js";
 import { MemoryStore } from "../src/pipeline/memory-store.js";
@@ -50,16 +50,20 @@ console.log(`\nrecord: ${record.reference.primary} · ${record.requester.organiz
 if (!live) {
   console.log("\n--- DRY RUN: nothing is sent ---");
   const { ids } = await ensureJobCustomFields(client, { dryRun: true, log: (s) => console.log(s) });
-  console.log("\ncustomer payload:", JSON.stringify({ ...customerPayload(record), locations: [locationPayload(record)] }, null, 2));
+  console.log("\ncustomer payload:", JSON.stringify({ ...customerPayload(record), locations: [{ ...locationPayload(record), object_type: CUSTOMER_MORPH_CLASS }] }, null, 2));
   console.log("\nlocation payload (if the customer already exists):", JSON.stringify(locationPayload(record), null, 2));
   console.log("\njob payload (customer_id/location_id filled in at delivery):", JSON.stringify(jobPayload(record, 0, 0, ids), null, 2));
   console.log("\nlookups that would run: GET /job?search=<reference>, GET /customer?search=<organization>, GET /location?filter[object_id]=<customer>");
   process.exit(0);
 }
 
-const { ids, created } = cachedIds ?? (await ensureJobCustomFields(client));
-if (created.length && cacheIds) await cacheIds(ids);
-if (!cachedIds && cacheIds) await cacheIds(ids);
+let ids: FieldIds;
+if (cachedIds) {
+  ids = cachedIds;
+} else {
+  ids = (await ensureJobCustomFields(client)).ids;
+  if (cacheIds) await cacheIds(ids);
+}
 console.log("field ids:", JSON.stringify(ids));
 const result = await deliverRecord(record, { client, fieldIds: ids, store, runId });
 console.log("\nresult:", JSON.stringify(result, null, 2));

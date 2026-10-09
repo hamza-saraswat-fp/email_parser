@@ -48,6 +48,8 @@ describe("deliverRecord", () => {
     expect(job).toMatchObject({ customer_id: 10, location_id: 20, job_type: "Lighting", billing: 1, status: 1 });
     expect(job.customfields).toEqual([{ field_instance_id: 1, value: "WO-2602977" }, { field_instance_id: 2, value: "heb" }, { field_instance_id: 3, value: "24 hours (Next Business Day)" }, { field_instance_id: 5, value: "770.0" }]);
     expect(store.rows[0]).toMatchObject({ status: "delivered", reference: "WO-2602977" });
+    const cust = calls.find((c) => c.path === "/customer" && c.method === "POST")!.body as any;
+    expect(cust.locations[0]).toMatchObject({ object_type: CUSTOMER_MORPH_CLASS, title: "770 KERR1 KERRVILLE 01 MAIN/HAYS ST #770.0" });
   });
 
   it("reuses an existing customer and location found by store id", async () => {

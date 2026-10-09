@@ -91,7 +91,8 @@ export async function deliverRecord(
     if (customer) {
       say(`customer "${custBody.company_name}" found: #${customer.id}`);
     } else {
-      request.customer = { ...custBody, locations: [locationPayload(record)] };
+      // Inline locations need the morph class too (locations.*.object_type is required).
+      request.customer = { ...custBody, locations: [{ ...locationPayload(record), object_type: CUSTOMER_MORPH_CLASS }] };
       customer = await client.post<any>("/customer", request.customer);
       createdCustomer = true;
       say(`customer "${custBody.company_name}" created: #${customer.id}`);

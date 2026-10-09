@@ -14,7 +14,7 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-const STATUS_ORDER: RunStatus[] = ["running", "ready", "needs_review", "approved", "rejected", "skipped", "failed"];
+const STATUS_ORDER: RunStatus[] = ["running", "ready", "needs_review", "delivered", "delivery_failed", "approved", "rejected", "skipped", "failed"];
 
 export function RunsPage() {
   const { data, isLoading, error } = useQuery({
