@@ -11,6 +11,8 @@ export default defineConfig({
       SUPABASE_SERVICE_KEY: "test-dummy-service-key",
       PARSER_INBOX_IDS: "parser_test@agentmail.to",
       AI_GATEWAY_API_KEY: "test-dummy-key",
+      FP_API_KEY: "test-dummy-key",
+      FP_COMPANY_ID: "1",
     },
     include: ["src/**/*.test.ts"],
   },

@@ -18,6 +18,9 @@
     "compare": "tsx scripts/compare-records.ts",
     "eval": "tsx scripts/eval.ts",
     "jev-smoke": "tsx scripts/jev-smoke.ts",
+    "fp:check": "tsx scripts/fp-check.ts",
+    "fp:setup": "tsx scripts/fp-setup.ts",
+    "fp:deliver": "tsx scripts/fp-deliver.ts",
     "send-fixture": "tsx scripts/send-fixture.ts",
     "create-inbox": "tsx scripts/create-inbox.ts"
   },

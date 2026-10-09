@@ -24,6 +24,12 @@ const envSchema = z.object({
   // Set to "false" to serve the API and page without subscribing to the inbox
   // (local UI work while Railway owns the inbox; two listeners would race).
   PARSER_LISTENER: z.enum(["true", "false"]).default("true"),
+  // FieldPulse external API (X-API-KEY = one user's api_token, scoped to that
+  // user's company). FP_COMPANY_ID is a guard: delivery refuses to run if the
+  // key's company is a different one.
+  FP_API_BASE_URL: z.string().url().default("https://apibe.fieldpulse.com/v2.5"),
+  FP_API_KEY: z.string().min(1).optional(),
+  FP_COMPANY_ID: z.coerce.number().int().positive().optional(),
   // Universal Auth (fieldpulse-auth). When set, every /api call must carry a
   // FieldPulse-issued token. Unset = open API, for local dev and tests only.
   // An empty string counts as unset, so `FP_AUTH_URL= npm run ...` can turn
