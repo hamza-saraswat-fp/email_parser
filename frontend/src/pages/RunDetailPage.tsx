@@ -158,7 +158,7 @@ export function RunDetailPage({ id }: { id: string }) {
         )}
         {data.reviewed_by && (
           <div className="mt-3 text-sm text-slate-600">
-            {data.status === "approved" ? "Approved" : "Rejected"} by {data.reviewed_by}{data.reviewed_at ? ` on ${new Date(data.reviewed_at).toLocaleString()}` : ""}{data.review_note ? ` · "${data.review_note}"` : ""}
+            {data.status === "rejected" ? "Rejected" : "Approved"} by {data.reviewed_by}{data.reviewed_at ? ` on ${new Date(data.reviewed_at).toLocaleString()}` : ""}{data.review_note ? ` · "${data.review_note}"` : ""}
           </div>
         )}
         {reviewable && (
@@ -215,7 +215,8 @@ export function RunDetailPage({ id }: { id: string }) {
         <h2 className="mb-2 flex items-baseline gap-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
           Steps
           <span className="text-xs font-normal normal-case tracking-normal text-slate-400">
-            {data.steps.length} of {PIPELINE_STEPS.length} ran · {fmtMs(data.steps.reduce((n, s) => n + (s.duration_ms ?? 0), 0))} total
+            {data.steps.filter((s) => (PIPELINE_STEPS as readonly string[]).includes(s.name)).length} of {PIPELINE_STEPS.length} ran
+            {data.steps.some((s) => s.name === "delivered") ? " + FieldPulse" : ""} · {fmtMs(data.steps.reduce((n, s) => n + (s.duration_ms ?? 0), 0))} total
           </span>
         </h2>
         <ol className="space-y-2">
