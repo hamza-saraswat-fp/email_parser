@@ -13,6 +13,12 @@ const MAX_RECONNECT_DELAY_MS = 60_000;
 // The process can be offline for a while (paused service, incident); a tight
 // window silently drops emails that arrived just outside it.
 const CATCHUP_LOOKBACK_MS = 48 * 60 * 60 * 1000;
+// Safety net behind the WebSocket. Observed Oct 2026: the socket went silent
+// for ~3 days without a close event, so the reconnect-and-catch-up path never
+// ran and new mail sat unprocessed. A periodic sweep over the same REST path
+// recovers anything the socket missed; dedupe on message_id makes it a no-op
+// when the socket is healthy.
+const SWEEP_INTERVAL_MS = 60_000;
 
 type AmSocket = Awaited<ReturnType<AgentMailClient["websockets"]["connect"]>>;
 
@@ -56,17 +62,35 @@ export async function startListener(routeInbound: RouteInbound, emailExists: (me
   let isSubscribed = false;
   let currentSocket: AmSocket | null = null;
 
-  async function catchUpMissedEmails(client: AgentMailClient): Promise<void> {
+  async function catchUpMissedEmails(client: AgentMailClient, quiet = false): Promise<void> {
     const after = lastConnectedAt
       ? new Date(lastConnectedAt.getTime() - 30_000)
       : new Date(Date.now() - CATCHUP_LOOKBACK_MS);
-    console.log(`[CATCHUP] Checking for missed emails since ${after.toISOString()}`);
+    if (!quiet) console.log(`[CATCHUP] Checking for missed emails since ${after.toISOString()}`);
     for (const inboxId of inboxIds) {
-      await catchUpInbox(client, inboxId, after);
+      await catchUpInbox(client, inboxId, after, quiet);
     }
   }
 
-  async function catchUpInbox(client: AgentMailClient, inboxId: string, after: Date): Promise<void> {
+  // Periodic sweep. Single-flight; the window starts 30s before the previous
+  // sweep (or the last connect), so nothing falls between sweeps.
+  let sweeping = false;
+  const sweepClient = new AgentMailClient({ apiKey: config.AGENTMAIL_API_KEY });
+  setInterval(async () => {
+    if (sweeping) return;
+    sweeping = true;
+    const startedAt = new Date();
+    try {
+      await catchUpMissedEmails(sweepClient, true);
+      lastConnectedAt = startedAt;
+    } catch (err) {
+      console.error("[SWEEP] failed:", err instanceof Error ? err.message : String(err));
+    } finally {
+      sweeping = false;
+    }
+  }, SWEEP_INTERVAL_MS).unref();
+
+  async function catchUpInbox(client: AgentMailClient, inboxId: string, after: Date, quiet = false): Promise<void> {
     const inboxLocalPart = inboxId.split("@")[0].toLowerCase();
     try {
       const response = await client.inboxes.messages.list(inboxId, { after, limit: 50, ascending: true });
@@ -95,7 +119,9 @@ export async function startListener(routeInbound: RouteInbound, emailExists: (me
           console.error(`[CATCHUP] Error processing missed email ${msgId}:`, err);
         }
       }
-      console.log(`[CATCHUP] ${inboxId}: ${caught} missed email(s) recovered, ${summaries.length} total checked`);
+      if (!quiet || caught > 0) {
+        console.log(`[${quiet ? "SWEEP" : "CATCHUP"}] ${inboxId}: ${caught} missed email(s) recovered, ${summaries.length} total checked`);
+      }
     } catch (err) {
       console.error(`[CATCHUP] Failed to fetch missed emails for ${inboxId}:`, err);
     }
