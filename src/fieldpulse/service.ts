@@ -58,7 +58,7 @@ export async function deliverRun(runId: string): Promise<DeliveryResult> {
   const position = await nextStepPosition(runId);
   try {
     const ids = await fieldIdsFor(record.customer_id);
-    const result = await deliverRecord(record, { client: getClient(), fieldIds: ids, store: new SupabaseDeliveryStore(), runId });
+    const result = await deliverRecord(record, { client: getClient(), fieldIds: ids, store: new SupabaseDeliveryStore(), runId, defaultTimezone: config.FP_DEFAULT_TIMEZONE });
     await supabase.from("parser_run_steps").insert({ run_id: runId, position, name: "delivered", status: "ok", input: { reference: record.reference.primary, organization: record.requester.organization, site: record.site.name }, output: result, error: null, duration_ms: Date.now() - t0 });
     await supabase.from("parser_runs").update({ status: "delivered" }).eq("id", runId);
     return result;

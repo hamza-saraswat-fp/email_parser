@@ -30,6 +30,8 @@ const envSchema = z.object({
   FP_API_BASE_URL: z.string().url().default("https://apibe.fieldpulse.com/v2.5"),
   FP_API_KEY: z.string().min(1).optional(),
   FP_COMPANY_ID: z.coerce.number().int().positive().optional(),
+  // Zone for portal times when the site's state is missing or unknown.
+  FP_DEFAULT_TIMEZONE: z.string().default("America/Chicago"),
   // Universal Auth (fieldpulse-auth). When set, every /api call must carry a
   // FieldPulse-issued token. Unset = open API, for local dev and tests only.
   // An empty string counts as unset, so `FP_AUTH_URL= npm run ...` can turn

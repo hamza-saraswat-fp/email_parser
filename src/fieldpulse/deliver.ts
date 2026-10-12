@@ -52,7 +52,7 @@ const asList = (v: any): any[] => (Array.isArray(v) ? v : v?.data ?? v?.customer
 
 export async function deliverRecord(
   record: ServiceRequest,
-  opts: { client: FieldPulseClient; fieldIds: FieldIds; store: DeliveryStore; runId?: string | null; log?: (s: string) => void },
+  opts: { client: FieldPulseClient; fieldIds: FieldIds; store: DeliveryStore; runId?: string | null; log?: (s: string) => void; defaultTimezone?: string },
 ): Promise<DeliveryResult> {
   const { client, fieldIds, store } = opts;
   const log = opts.log ?? ((s) => console.log(s));
@@ -128,7 +128,7 @@ export async function deliverRecord(
     }
 
     // 5. Job.
-    request.job = jobPayload(record, Number(customer.id), location ? Number(location.id) : null, fieldIds);
+    request.job = jobPayload(record, Number(customer.id), location ? Number(location.id) : null, fieldIds, opts.defaultTimezone);
     const job = await client.post<any>("/job", request.job);
     say(`job created: #${job.id} (cuid ${job.cuid})`);
     const row: DeliveryRow = {

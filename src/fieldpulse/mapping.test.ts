@@ -32,7 +32,7 @@ describe("mapping", () => {
   });
   it("builds the job with required fields, verbatim notes and custom fields by instance id", () => {
     const j = jobPayload(rec, 10, 20, { portal_reference: 1, portal: 2, portal_priority: 3, nte: 4, portal_store_id: 5 });
-    expect(j).toMatchObject({ customer_id: 10, location_id: 20, job_type: "LIGHTING INTERIOR", billing: 1, status: 1, type: "job", start_time: Math.floor(Date.parse("2027-02-24T08:51:00") / 1000) });
+    expect(j).toMatchObject({ customer_id: 10, location_id: 20, job_type: "LIGHTING INTERIOR", billing: 1, status: 1, type: "job", start_time: Date.UTC(2027, 1, 24, 13, 51) / 1000 }); // 8:51 AM in Amherst, NY (EST)
     expect(j.notes).toContain("Light bulb is out\n\nBACKROOM / Lighting / Old bank light very dim.");
     expect(j.notes).toContain("PO#: 363163523");
     expect(j.notes).toContain("NTE: 1000.00");

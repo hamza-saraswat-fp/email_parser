@@ -52,7 +52,7 @@ if (!live) {
   const { ids } = await ensureJobCustomFields(client, { dryRun: true, log: (s) => console.log(s) });
   console.log("\ncustomer payload:", JSON.stringify({ ...customerPayload(record), locations: [{ ...locationPayload(record), object_type: CUSTOMER_MORPH_CLASS }] }, null, 2));
   console.log("\nlocation payload (if the customer already exists):", JSON.stringify(locationPayload(record), null, 2));
-  console.log("\njob payload (customer_id/location_id filled in at delivery):", JSON.stringify(jobPayload(record, 0, 0, ids), null, 2));
+  console.log("\njob payload (customer_id/location_id filled in at delivery):", JSON.stringify(jobPayload(record, 0, 0, ids, config.FP_DEFAULT_TIMEZONE), null, 2));
   console.log("\nlookups that would run: GET /job?search=<reference>, GET /customer?search=<organization>, GET /location?filter[object_id]=<customer>");
   process.exit(0);
 }
@@ -65,5 +65,5 @@ if (cachedIds) {
   if (cacheIds) await cacheIds(ids);
 }
 console.log("field ids:", JSON.stringify(ids));
-const result = await deliverRecord(record, { client, fieldIds: ids, store, runId });
+const result = await deliverRecord(record, { client, fieldIds: ids, store, runId, defaultTimezone: config.FP_DEFAULT_TIMEZONE });
 console.log("\nresult:", JSON.stringify(result, null, 2));

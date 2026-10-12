@@ -2,6 +2,7 @@
 // verbatim from the record, which the pipeline already verified against the
 // email. Nothing here invents or rewrites text.
 import type { ServiceRequest } from "../schema/record.js";
+import { timezoneForState, wallTimeToUnix } from "./timezone.js";
 
 // The five job custom fields the parser needs. FieldPulse has no native slot
 // for any of them. Widget ids follow the seed order: 1 text, 2 number.
@@ -84,13 +85,7 @@ export function jobNotes(r: ServiceRequest): string {
   return lines.join("\n").slice(0, 20000);
 }
 
-function toUnix(iso: string | null): number | undefined {
-  if (!iso) return undefined;
-  const t = Date.parse(iso);
-  return Number.isNaN(t) ? undefined : Math.floor(t / 1000);
-}
-
-export function jobPayload(r: ServiceRequest, customerId: number, locationId: number | null, fieldIds: FieldIds) {
+export function jobPayload(r: ServiceRequest, customerId: number, locationId: number | null, fieldIds: FieldIds, siteTimezoneFallback?: string) {
   const values: Record<FieldKey, string | number | null> = {
     portal_reference: r.reference.primary,
     portal: r.source.portal,
@@ -101,7 +96,9 @@ export function jobPayload(r: ServiceRequest, customerId: number, locationId: nu
   const customfields = (Object.keys(values) as FieldKey[])
     .filter((k) => fieldIds[k] != null && values[k] != null && values[k] !== "")
     .map((k) => ({ field_instance_id: fieldIds[k]!, value: values[k] }));
-  const start = toUnix(r.deadlines.scheduled_for);
+  // Portal times are the site's local wall clock; read them in the site's zone.
+  const zone = timezoneForState(r.site.address.state, siteTimezoneFallback);
+  const start = wallTimeToUnix(r.deadlines.scheduled_for, zone);
   return {
     customer_id: customerId,
     location_id: locationId ?? undefined,
